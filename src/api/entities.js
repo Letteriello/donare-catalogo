@@ -1,7 +1,7 @@
 // Implementações de entidades com Firebase Firestore
 import { db, auth } from './firebase';
 import { 
-  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit 
+  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot
 } from 'firebase/firestore';
 import { 
   GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
@@ -32,6 +32,45 @@ export const Product = {
     } catch (error) {
       console.error('Erro ao listar produtos:', error);
       return [];
+    }
+  },
+  
+  // NOVO: Método para ouvir mudanças em tempo real nos produtos
+  listenForChanges: (callback, categoryId = null) => {
+    try {
+      // Define a query com ou sem filtro por categoria
+      let productsQuery;
+      
+      if (categoryId) {
+        productsQuery = query(
+          collection(db, 'products'), 
+          where('categoryId', '==', categoryId),
+          orderBy('name')
+        );
+      } else {
+        productsQuery = query(
+          collection(db, 'products'),
+          orderBy('name')
+        );
+      }
+      
+      // Registra o listener e armazena a função de cancelamento
+      const unsubscribe = onSnapshot(productsQuery, (snapshot) => {
+        // Mapeia os documentos recebidos para o formato esperado
+        const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Chama o callback fornecido com os dados atualizados
+        callback(products);
+      }, (error) => {
+        console.error('Erro no listener de produtos:', error);
+        callback([]);
+      });
+      
+      // Retorna a função de cancelamento para ser usada quando não precisarmos mais escutar
+      return unsubscribe;
+    } catch (error) {
+      console.error('Erro ao configurar listener para produtos:', error);
+      return () => {}; // Função vazia em caso de falha
     }
   },
   
@@ -89,39 +128,39 @@ export const Category = {
   // Métodos para manipulação de categorias
   list: async () => {
     try {
-      let categoriesQuery;
-      
-      try {
-        // Tenta primeiro com ordenação por 'order'
-        categoriesQuery = query(
-          collection(db, 'categories'),
-          orderBy('order')
-        );
-      } catch (orderError) {
-        console.warn('Campo order não existe, usando nome para ordenação:', orderError);
-        
-        // Se falhar, usa ordenação por 'name'
-        categoriesQuery = query(
-          collection(db, 'categories'),
-          orderBy('name')
-        );
-      }
-      
-      // Se ainda falhar, busca sem ordenação
-      try {
-        const snapshot = await getDocs(categoriesQuery);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      } catch (queryError) {
-        console.warn('Erro na query com ordenação, buscando sem ordenação:', queryError);
-        
-        // Último recurso: busca sem ordenação
-        const simpleQuery = collection(db, 'categories');
-        const snapshot = await getDocs(simpleQuery);
-        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      }
+      // Primeiro, tentamos com getDocs para compatibilidade imediata
+      const simpleQuery = collection(db, 'categories');
+      const snapshot = await getDocs(simpleQuery);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     } catch (error) {
       console.error('Erro ao listar categorias:', error);
       return [];
+    }
+  },
+
+  // NOVO: Método para ouvir mudanças em tempo real nas categorias
+  listenForChanges: (callback) => {
+    try {
+      // Cria um listener em tempo real para a coleção de categorias
+      const categoriesCollection = collection(db, 'categories');
+      
+      // Registra o listener e armazena a função de cancelamento
+      const unsubscribe = onSnapshot(categoriesCollection, (snapshot) => {
+        // Mapeia os documentos recebidos para o formato esperado
+        const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Chama o callback fornecido com os dados atualizados
+        callback(categories);
+      }, (error) => {
+        console.error('Erro no listener de categorias:', error);
+        callback([]);
+      });
+      
+      // Retorna a função de cancelamento para ser usada quando não precisarmos mais escutar
+      return unsubscribe;
+    } catch (error) {
+      console.error('Erro ao configurar listener para categorias:', error);
+      return () => {}; // Função vazia em caso de falha
     }
   },
   

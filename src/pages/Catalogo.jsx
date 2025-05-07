@@ -15,69 +15,89 @@ export default function Catalogo() {
   const location = useLocation();
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const urlParams = new URLSearchParams(location.search);
-        const categoryId = urlParams.get("categoria");
+    setIsLoading(true);
+    setError(null);
+    
+    // Extrai o ID da categoria da URL
+    const urlParams = new URLSearchParams(location.search);
+    const categoryId = urlParams.get("categoria");
+    
+    console.log("[DEBUG] Parâmetro categoria na URL:", categoryId);
+    
+    // Variáveis para armazenar as funções de cancelamento
+    let unsubscribeCategories = null;
+    let unsubscribeProducts = null;
+    
+    try {
+      // 1. Configura listener em tempo real para categorias
+      unsubscribeCategories = Category.listenForChanges((categories) => {
+        console.log("[DEBUG] Categorias atualizadas em tempo real:", categories);
         
-        // Adicionar logs para depuração
-        console.log("[DEBUG] Parâmetro categoria na URL:", categoryId);
-        
-        try {
-          // Carregar categorias
-          const categories = await Category.list();
-          console.log("[DEBUG] Categorias carregadas:", categories);
+        if (categoryId) {
+          // Encontrar a categoria atual com correspondência mais flexível
+          const categoryData = categories.find(cat => 
+            cat.id === categoryId || 
+            (cat.id && cat.id.toLowerCase() === categoryId.toLowerCase()) ||
+            (cat.name && cat.name.toLowerCase().replace(/ /g, '_') === categoryId.toLowerCase())
+          );
           
-          // Carregar todos os produtos primeiro
-          const allProducts = await Product.list();
-          console.log("[DEBUG] Produtos carregados:", allProducts);
+          console.log("[DEBUG] Categoria encontrada:", categoryData);
+          setCategory(categoryData);
           
-          if (categoryId) {
-            // Encontrar a categoria atual com correspondência mais flexível
-            const categoryData = categories.find(cat => 
-              cat.id === categoryId || 
-              (cat.id && cat.id.toLowerCase() === categoryId.toLowerCase()) ||
-              (cat.name && cat.name.toLowerCase().replace(/ /g, '_') === categoryId.toLowerCase())
-            );
-            
-            console.log("[DEBUG] Categoria encontrada:", categoryData);
-            setCategory(categoryData);
-            
-            if (categoryData?.id) {
-              // Filtrar produtos pela categoria com log para verificar
-              const filteredProducts = allProducts.filter(product => {
-                console.log("[DEBUG] Verificando produto:", product.name, "categoryId:", product.categoryId, "comparando com:", categoryData.id);
-                return product.categoryId === categoryData.id;
-              });
-              
-              console.log("[DEBUG] Produtos filtrados:", filteredProducts);
-              setProducts(filteredProducts);
-            } else {
-              console.log("[AVISO] Categoria não encontrada, mostrando todos os produtos");
-              setProducts(allProducts);
+          // 2. Configura listener em tempo real para produtos com filtro de categoria
+          if (categoryData?.id) {
+            // Se já existe um listener para produtos, limpe-o primeiro
+            if (unsubscribeProducts) {
+              unsubscribeProducts();
             }
+            
+            // Configura novo listener para produtos filtrados por categoria
+            unsubscribeProducts = Product.listenForChanges((products) => {
+              console.log("[DEBUG] Produtos atualizados em tempo real:", products);
+              setProducts(products);
+              setIsLoading(false);
+            }, categoryData.id); // Passa o ID da categoria como filtro
           } else {
-            // Se não houver categoria especificada, mostrar todos os produtos
-            console.log("[DEBUG] Nenhuma categoria especificada, mostrando todos os produtos");
-            setProducts(allProducts);
+            // Se não encontrou a categoria, mostra todos os produtos
+            console.log("[AVISO] Categoria não encontrada, mostrando todos os produtos");
+            
+            if (unsubscribeProducts) {
+              unsubscribeProducts();
+            }
+            
+            unsubscribeProducts = Product.listenForChanges((products) => {
+              console.log("[DEBUG] Todos os produtos atualizados em tempo real:", products);
+              setProducts(products);
+              setIsLoading(false);
+            });
+          }
+        } else {
+          // Se não há categoria especificada, mostra todos os produtos
+          console.log("[DEBUG] Nenhuma categoria especificada, mostrando todos os produtos");
+          
+          if (unsubscribeProducts) {
+            unsubscribeProducts();
           }
           
-        } catch (error) {
-          console.error("Erro ao carregar dados:", error);
-          setError("Erro ao carregar dados. Por favor, tente novamente.");
+          unsubscribeProducts = Product.listenForChanges((products) => {
+            console.log("[DEBUG] Todos os produtos atualizados em tempo real:", products);
+            setProducts(products);
+            setIsLoading(false);
+          });
         }
-      } catch (error) {
-        console.error("Erro geral:", error);
-        setError("Ocorreu um erro ao carregar a página. Por favor, tente novamente mais tarde.");
-      } finally {
-        setIsLoading(false);
-      }
+      });
+    } catch (error) {
+      console.error("Erro ao configurar listeners:", error);
+      setError("Erro ao carregar dados. Por favor, tente novamente.");
+      setIsLoading(false);
+    }
+    
+    // Limpa os listeners quando o componente for desmontado
+    return () => {
+      console.log("[DEBUG] Limpando listeners");
+      if (unsubscribeCategories) unsubscribeCategories();
+      if (unsubscribeProducts) unsubscribeProducts();
     };
-
-    loadData();
   }, [location.search]);
 
   const handleRetry = () => {

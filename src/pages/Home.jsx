@@ -16,45 +16,49 @@ export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
   const [loginError, setLoginError] = useState('');
 
-  // Carregar categorias com intervalo para evitar rate limit
+  // Carregar categorias com escuta em tempo real
   useEffect(() => {
-    const loadCategories = async () => {
-      if (retryCount > 3) {
-        setErrorMessage("Muitas tentativas. Por favor, aguarde alguns minutos e tente novamente.");
-        setIsLoading(false);
-        return;
-      }
-
-      setIsLoading(true);
-      setErrorMessage(null);
-      
-      try {
-        const data = await Category.list();
-        setCategories(data);
-        setRetryCount(0);
-      } catch (error) {
-        console.error("Erro ao carregar categorias:", error);
-        // Verificar se é erro de rate limit (429)
-        if (error.message && error.message.includes("429")) {
-          setErrorMessage("Muitas requisições. Aguardando antes de tentar novamente...");
-          // Aguardar mais tempo em cada retry (backoff exponencial)
-          const waitTime = Math.min(2000 * Math.pow(2, retryCount), 10000);
-          setTimeout(() => {
-            setRetryCount(prev => prev + 1);
-          }, waitTime);
-        } else {
-          setErrorMessage("Não foi possível carregar as categorias. Por favor, tente novamente.");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
+    setErrorMessage(null);
     
-    loadCategories();
-  }, [retryCount]);
+    // Primeiro carregamento e configuração de listener em tempo real
+    try {
+      // Inicialização da lista com método list() síncrono tradicional
+      const initialLoad = async () => {
+        try {
+          const initialData = await Category.list();
+          console.log("[DEBUG] Carregamento inicial de categorias:", initialData);
+          setCategories(initialData);
+        } catch (initialError) {
+          console.error("Erro no carregamento inicial:", initialError);
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      initialLoad();
+      
+      // Configura um listener para atualizações em tempo real
+      const unsubscribe = Category.listenForChanges((updatedCategories) => {
+        console.log("[DEBUG] Categorias atualizadas em tempo real:", updatedCategories);
+        setCategories(updatedCategories);
+        setIsLoading(false);
+        setErrorMessage(null);
+      });
+      
+      // Limpa o listener quando o componente for desmontado
+      return () => {
+        console.log("[DEBUG] Limpando listener de categorias");
+        unsubscribe();
+      };
+    } catch (error) {
+      console.error("Erro geral ao configurar listeners:", error);
+      setErrorMessage("Não foi possível carregar as categorias. Por favor, tente novamente.");
+      setIsLoading(false);
+    }
+  }, []);
 
   // Verificar autenticação ao carregar
   useEffect(() => {
@@ -110,7 +114,8 @@ export default function Home() {
   };
 
   const handleRetry = () => {
-    setRetryCount(prev => prev + 1);
+    // Recarregar a página manualmente
+    window.location.reload();
   };
 
   const fadeIn = {
