@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Instagram, Facebook, MessageCircle, FileText, ExternalLink } from "lucide-react";
+import { Instagram, Lightbulb, MessageCircle, FileText, ExternalLink } from "lucide-react";
 import PropTypes from "prop-types";
 
 export default function LandingBio() {
@@ -38,14 +38,14 @@ export default function LandingBio() {
       id: 'instagram', 
       icon: <Instagram size={20} />, 
       label: "Instagram", 
-      url: "https://instagram.com/donarehome", 
+      url: "https://www.instagram.com/donarehome_", 
       external: true 
     },
     { 
-      id: 'facebook', 
-      icon: <Facebook size={20} />, 
-      label: "Facebook", 
-      url: "https://facebook.com/donarehome", 
+      id: 'pinterest', 
+      icon: <Lightbulb size={20} />, 
+      label: "Idéias no Pinterest 💡", 
+      url: "https://br.pinterest.com/donarehome/", 
       external: true 
     },
     { 
