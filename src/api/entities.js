@@ -89,13 +89,36 @@ export const Category = {
   // Métodos para manipulação de categorias
   list: async () => {
     try {
-      const categoriesQuery = query(
-        collection(db, 'categories'),
-        orderBy('order')
-      );
+      let categoriesQuery;
       
-      const snapshot = await getDocs(categoriesQuery);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      try {
+        // Tenta primeiro com ordenação por 'order'
+        categoriesQuery = query(
+          collection(db, 'categories'),
+          orderBy('order')
+        );
+      } catch (orderError) {
+        console.warn('Campo order não existe, usando nome para ordenação:', orderError);
+        
+        // Se falhar, usa ordenação por 'name'
+        categoriesQuery = query(
+          collection(db, 'categories'),
+          orderBy('name')
+        );
+      }
+      
+      // Se ainda falhar, busca sem ordenação
+      try {
+        const snapshot = await getDocs(categoriesQuery);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      } catch (queryError) {
+        console.warn('Erro na query com ordenação, buscando sem ordenação:', queryError);
+        
+        // Último recurso: busca sem ordenação
+        const simpleQuery = collection(db, 'categories');
+        const snapshot = await getDocs(simpleQuery);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }
     } catch (error) {
       console.error('Erro ao listar categorias:', error);
       return [];
