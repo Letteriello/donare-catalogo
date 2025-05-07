@@ -193,9 +193,29 @@ export const Category = {
   
   update: async (id, categoryData) => {
     try {
+      console.log(`Tentando atualizar documento com ID: ${id}`, categoryData);
+      
+      // Remover o campo ID dos dados a serem atualizados para evitar conflitos
+      // O Firestore não permite alterar o ID do documento
+      const { id: docId, ...dataToUpdate } = categoryData;
+      
+      // Criar referência do documento
       const docRef = doc(db, 'categories', id);
-      await updateDoc(docRef, categoryData);
-      return { id, ...categoryData };
+      
+      // Verificar se o documento existe
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        console.error(`Documento não encontrado para o ID: ${id}`);
+        throw new Error('Documento não encontrado no Firestore');
+      }
+      
+      console.log('Documento encontrado, atualizando com dados:', dataToUpdate);
+      
+      // Atualizar o documento
+      await updateDoc(docRef, dataToUpdate);
+      console.log('Documento atualizado com sucesso');
+      
+      return { id, ...dataToUpdate };
     } catch (error) {
       console.error('Erro ao atualizar categoria:', error);
       throw error;
@@ -204,7 +224,24 @@ export const Category = {
   
   delete: async (id) => {
     try {
-      await deleteDoc(doc(db, 'categories', id));
+      console.log(`Tentando excluir documento com ID: ${id}`);
+      
+      // Criar referência do documento
+      const docRef = doc(db, 'categories', id);
+      
+      // Verificar se o documento existe antes de tentar excluir
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        console.error(`Documento não encontrado para o ID: ${id}`);
+        throw new Error('Documento não encontrado no Firestore');
+      }
+      
+      console.log('Documento encontrado, excluindo...');
+      
+      // Excluir o documento
+      await deleteDoc(docRef);
+      console.log('Documento excluído com sucesso');
+      
       return { success: true };
     } catch (error) {
       console.error('Erro ao excluir categoria:', error);
