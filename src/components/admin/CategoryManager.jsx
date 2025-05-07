@@ -1,9 +1,9 @@
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { Category } from '@/api/entities';
 import { UploadFile } from "@/api/integrations";
 import { Plus, Trash2, Edit, Image as ImageIcon, Save, X, Search, Loader2, GripVertical } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 export default function CategoryManager() {
@@ -42,7 +42,7 @@ export default function CategoryManager() {
       .replace(/\s+/g, '_');
   };
 
-  const handleImageUpload = async (e, isEditing, categoryId) => {
+  const handleImageUpload = async (e, isEditing) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -103,6 +103,7 @@ export default function CategoryManager() {
     (category.description && category.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Definição do componente CategoryForm com props explícitas
   const CategoryForm = ({ isEditing, data, onSubmit, onCancel }) => {
     // Criar estado local para os campos do formulário
     const [localData, setLocalData] = useState(data);
@@ -144,10 +145,14 @@ export default function CategoryManager() {
       
         <div className="grid grid-cols-1 gap-6">
           <div>
-            <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
+            <label 
+              htmlFor="category-name" 
+              className="block text-sm font-medium text-[#0B1F3A] mb-2"
+            >
               Nome da Categoria *
             </label>
             <input
+              id="category-name"
               type="text"
               value={localData.name}
               onChange={(e) => handleFieldChange('name', e.target.value)}
@@ -158,10 +163,14 @@ export default function CategoryManager() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
+            <label 
+              htmlFor="category-description" 
+              className="block text-sm font-medium text-[#0B1F3A] mb-2"
+            >
               Descrição
             </label>
             <textarea
+              id="category-description"
               value={localData.description}
               onChange={(e) => handleFieldChange('description', e.target.value)}
               className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50"
@@ -171,7 +180,10 @@ export default function CategoryManager() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
+            <label 
+              htmlFor="category-image" 
+              className="block text-sm font-medium text-[#0B1F3A] mb-2"
+            >
               Imagem da Categoria
             </label>
             <div className="flex items-center gap-4">
@@ -192,10 +204,14 @@ export default function CategoryManager() {
                 </div>
               ) : (
                 <div className="w-32 h-32 bg-[#F4F1EC] flex items-center justify-center rounded-xl border-2 border-dashed border-[#0B1F3A]/20">
-                  <label className="cursor-pointer text-center">
+                  <label 
+                    htmlFor="category-image" 
+                    className="cursor-pointer text-center"
+                  >
                     <ImageIcon size={24} className="mx-auto mb-2 text-[#0B1F3A]/40" />
                     <span className="text-xs text-[#0B1F3A]/60">Upload</span>
                     <input
+                      id="category-image"
                       type="file"
                       accept="image/*"
                       onChange={(e) => handleImageUpload(e, isEditing, localData.id)}
@@ -236,6 +252,18 @@ export default function CategoryManager() {
         </div>
       </form>
     );
+  };
+
+  CategoryForm.propTypes = {
+    isEditing: PropTypes.bool.isRequired,
+    data: PropTypes.shape({
+      id: PropTypes.string,
+      name: PropTypes.string.isRequired,
+      description: PropTypes.string,
+      image: PropTypes.string
+    }).isRequired,
+    onSubmit: PropTypes.func.isRequired,
+    onCancel: PropTypes.func.isRequired
   };
 
   if (isLoading) {
