@@ -324,23 +324,32 @@ export default function CategoryManager() {
       setCategories(items);
       
       // Atualizar cada item com sua nova ordem no Firebase
+      // Usamos Promise.all para garantir que todas as atualizações sejam feitas
+      console.log('Iniciando atualização de ordens...');
+      
+      // Primeiro, vamos simplificar e garantir que temos apenas os dados necessários
       const updatePromises = items.map(async (category, index) => {
         try {
-          // Atualizar apenas o campo 'order' para cada categoria
-          await Category.update(category.id, { ...category, order: index });
+          // Vamos criar um novo objeto para atualização para evitar conflitos
+          await Category.update(category.id, { order: index });
           console.log(`Ordem da categoria ${category.name} atualizada para ${index}`);
         } catch (error) {
           console.error(`Erro ao atualizar ordem da categoria ${category.name}:`, error);
+          throw error; // Relança o erro para ser capturado pelo Promise.all
         }
       });
       
       // Aguardar todas as atualizações completarem
       await Promise.all(updatePromises);
-      console.log('Todas as ordens de categorias foram atualizadas');
+      console.log('Todas as ordens de categorias foram atualizadas com sucesso!');
+      
+      // Forçar uma recarga das categorias para garantir que temos os dados mais recentes
+      await loadCategories();
     } catch (error) {
       console.error('Erro ao reorganizar categorias:', error);
       // Recarregar as categorias originais em caso de erro
-      loadCategories();
+      await loadCategories();
+      alert('Ocorreu um erro ao reorganizar as categorias. Por favor, tente novamente.');
     }
   };
 

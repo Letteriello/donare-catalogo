@@ -1,7 +1,7 @@
 // Implementações de entidades com Firebase Firestore
 import { db, auth } from './firebase';
 import { 
-  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot
+  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc, query, where, orderBy, limit, onSnapshot, serverTimestamp
 } from 'firebase/firestore';
 import { 
   GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
@@ -38,16 +38,20 @@ export const Product = {
   // NOVO: Método para ouvir mudanças em tempo real nos produtos
   listenForChanges: (callback, categoryId = null) => {
     try {
+      console.log(`[DEBUG] Configurando listener para produtos ${categoryId ? `da categoria: ${categoryId}` : 'de todas as categorias'}`);
+      
       // Define a query com ou sem filtro por categoria
       let productsQuery;
       
       if (categoryId) {
-        // Solução temporária enquanto o índice está sendo construído:
-        // Apenas filtramos por categoryId sem ordenar
+        // Utilizamos o campo 'categoryId' para filtrar produtos
+        // Vamos garantir que estamos usando o campo correto e valor correto
+        console.log(`[DEBUG] Buscando produtos com categoryId = '${categoryId}'`);
+        
         productsQuery = query(
           collection(db, 'products'), 
           where('categoryId', '==', categoryId)
-          // a ordenação por 'name' foi removida temporariamente até que o índice esteja pronto
+          // a ordenação foi removida para evitar problemas com índices
         );
       } else {
         // Sem filtro, podemos manter a ordenação
@@ -96,8 +100,26 @@ export const Product = {
   
   create: async (productData) => {
     try {
-      const docRef = await addDoc(collection(db, 'products'), productData);
-      return { id: docRef.id, ...productData };
+      // Garantir que os dados do produto estão formatados corretamente
+      // Especialmente o campo categoryId que deve estar no formato correto
+      console.log('[DEBUG] Criando produto com dados:', productData);
+      
+      // Verificar se categoryId existe e não está vazio
+      if (!productData.categoryId) {
+        console.error('Erro: tentativa de criar produto sem categoryId');
+        throw new Error('O campo categoryId é obrigatório para criar um produto');
+      }
+      
+      // Garantir que o campo categoryId seja uma string
+      const productToSave = {
+        ...productData,
+        categoryId: String(productData.categoryId),
+        createdAt: serverTimestamp()
+      };
+      
+      const docRef = await addDoc(collection(db, 'products'), productToSave);
+      console.log(`[DEBUG] Produto criado com ID: ${docRef.id}`);
+      return { id: docRef.id, ...productToSave };
     } catch (error) {
       console.error('Erro ao criar produto:', error);
       throw error;

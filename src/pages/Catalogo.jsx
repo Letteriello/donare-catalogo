@@ -24,6 +24,14 @@ export default function Catalogo() {
     
     console.log("[DEBUG] Parâmetro categoria na URL:", categoryId);
     
+    // Garantir que o categoryId não seja uma string vazia
+    if (categoryId === "") {
+      console.log("[DEBUG] categoryId é uma string vazia, ajustando para null");
+      setError("Categoria não especificada. Selecione uma categoria válida.");
+      setIsLoading(false);
+      return;
+    }
+    
     // Variáveis para armazenar as funções de cancelamento
     let unsubscribeCategories = null;
     let unsubscribeProducts = null;
@@ -42,6 +50,14 @@ export default function Catalogo() {
           );
           
           console.log("[DEBUG] Categoria encontrada:", categoryData);
+          
+          if (!categoryData) {
+            console.log("[ERRO] Categoria não encontrada para ID:", categoryId);
+            setError(`Categoria não encontrada. ID: ${categoryId}`);
+            setIsLoading(false);
+            return;
+          }
+          
           setCategory(categoryData);
           
           // 2. Configura listener em tempo real para produtos com filtro de categoria
@@ -52,8 +68,17 @@ export default function Catalogo() {
             }
             
             // Configura novo listener para produtos filtrados por categoria
+            console.log(`[DEBUG] Buscando produtos para categoria: ${categoryData.name} (ID: ${categoryData.id})`);
             unsubscribeProducts = Product.listenForChanges((products) => {
               console.log("[DEBUG] Produtos atualizados em tempo real:", products);
+              // Debugando os dados de produtos para verificar se estão corretos
+              if (products.length === 0) {
+                console.log("[DEBUG] Nenhum produto encontrado para esta categoria");
+              } else {
+                console.log("[DEBUG] Exemplo do primeiro produto:", products[0]);
+                console.log("[DEBUG] categoryId do primeiro produto:", products[0].categoryId);
+              }
+              
               setProducts(products);
               setIsLoading(false);
             }, categoryData.id); // Passa o ID da categoria como filtro
