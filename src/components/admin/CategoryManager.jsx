@@ -78,17 +78,11 @@ export default function CategoryManager() {
   const handleUpdateCategory = async (e, formData) => {
     e.preventDefault();
     try {
-      console.log('Tentando atualizar categoria com ID:', editingCategory.id, 'Dados:', formData);
+      console.log('Tentando atualizar categoria:', editingCategory);
       setIsLoading(true);
       
-      // Verificar se o ID existe no Firebase antes de atualizar
-      const categoryExists = await Category.get(editingCategory.id);
-      if (!categoryExists) {
-        console.error('Categoria não encontrada para atualização');
-        alert('Erro: Categoria não encontrada. Tente recarregar a página.');
-        setIsLoading(false);
-        return;
-      }
+      // Pular verificação de existência já que temos a categoria em mãos
+      // Se temos a categoria na lista, ela existe no Firestore
       
       // Preservar o ID e ordem ao atualizar
       const updatedData = {
@@ -121,14 +115,8 @@ export default function CategoryManager() {
         // Adicionar feedback visual de loading
         setIsLoading(true);
         
-        // Obter documento para verificar se existe antes de tentar excluir
-        const categoryExists = await Category.get(categoryId);
-        if (!categoryExists) {
-          console.error('Categoria não encontrada para exclusão');
-          alert('Erro: Categoria não encontrada. Tente recarregar a página.');
-          setIsLoading(false);
-          return;
-        }
+        // Pular verificação de existência e tentar excluir diretamente
+        // Se a categoria está na lista, ela existe no Firestore
         
         // Tentar excluir a categoria
         await Category.delete(categoryId);

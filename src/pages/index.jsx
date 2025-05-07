@@ -1,29 +1,21 @@
 import Layout from "./Layout.jsx";
 
 import Home from "./Home";
-
+import LandingBio from "./LandingBio";
 import Catalogo from "./Catalogo";
-
 import ProdutoDetalhe from "./ProdutoDetalhe";
-
 import Admin from "./Admin";
-
 import Contato from "./Contato";
 
 import { BrowserRouter as Router, Route, Routes, useLocation } from 'react-router-dom';
 
 const PAGES = {
-    
+    LandingBio: LandingBio,
     Home: Home,
-    
-    Catalogo: Catalogo,
-    
+    Catalog: Catalogo,  // Renomeado para manter em inglês como os outros
     ProdutoDetalhe: ProdutoDetalhe,
-    
     Admin: Admin,
-    
-    Contato: Contato,
-    
+    Contato: Contato
 }
 
 function _getCurrentPage(url) {
@@ -47,19 +39,17 @@ function PagesContent() {
     return (
         <Layout currentPageName={currentPage}>
             <Routes>            
+                {/* Nova página inicial no estilo Bio/LinkTree */}
+                <Route path="/" element={<LandingBio />} />
                 
-                    <Route path="/" element={<Home />} />
+                {/* Página de catálogo anterior, agora movida para rotas específicas */}
+                <Route path="/home" element={<Home />} />
+                <Route path="/catalog" element={<Catalogo />} />
                 
-                
-                <Route path="/Home" element={<Home />} />
-                
-                <Route path="/Catalogo" element={<Catalogo />} />
-                
-                <Route path="/ProdutoDetalhe" element={<ProdutoDetalhe />} />
-                
-                <Route path="/Admin" element={<Admin />} />
-                
-                <Route path="/Contato" element={<Contato />} />
+                {/* Outras rotas */}
+                <Route path="/produto" element={<ProdutoDetalhe />} />
+                <Route path="/admin" element={<Admin />} />
+                <Route path="/contato" element={<Contato />} />
                 
             </Routes>
         </Layout>
