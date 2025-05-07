@@ -42,12 +42,15 @@ export const Product = {
       let productsQuery;
       
       if (categoryId) {
+        // Solução temporária enquanto o índice está sendo construído:
+        // Apenas filtramos por categoryId sem ordenar
         productsQuery = query(
           collection(db, 'products'), 
-          where('categoryId', '==', categoryId),
-          orderBy('name')
+          where('categoryId', '==', categoryId)
+          // a ordenação por 'name' foi removida temporariamente até que o índice esteja pronto
         );
       } else {
+        // Sem filtro, podemos manter a ordenação
         productsQuery = query(
           collection(db, 'products'),
           orderBy('name')
@@ -197,7 +200,8 @@ export const Category = {
       
       // Remover o campo ID dos dados a serem atualizados para evitar conflitos
       // O Firestore não permite alterar o ID do documento
-      const { id: docId, ...dataToUpdate } = categoryData;
+      const dataToUpdate = { ...categoryData };
+      delete dataToUpdate.id; // Remove o campo ID se existir
       
       // Criar referência do documento
       const docRef = doc(db, 'categories', id);
