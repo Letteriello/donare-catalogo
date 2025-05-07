@@ -69,15 +69,17 @@ export default function LandingBio() {
         {/* Logo e cabeçalho */}
         <div className="text-center mb-8">
           <div className="mb-4 flex justify-center">
-            <img 
-              src="/logo.png" 
-              alt="Donare Home" 
-              className="h-24 w-auto"
-              onError={(e) => {
-                e.target.onerror = null; 
-                e.target.src = "https://placehold.co/200x200/F4F1EC/0B1F3A?text=Donare+Home";
-              }}
-            />
+            <div className="rounded-full w-32 h-32 p-0.5 border-2 border-[#0B1F3A] overflow-hidden flex items-center justify-center bg-white shadow-sm">
+              <img 
+                src="/img/logo.svg" 
+                alt="Donare Home" 
+                className="h-28 w-28 object-contain"
+                onError={(e) => {
+                  e.target.onerror = null; 
+                  e.target.src = "https://placehold.co/200x200/F4F1EC/0B1F3A?text=Donare+Home";
+                }}
+              />
+            </div>
           </div>
           <h1 className="font-belleza text-4xl text-[#0B1F3A] mb-2">Donare Home</h1>
           <p className="text-[#0B1F3A]/70 text-lg">Decoração para sua casa</p>
