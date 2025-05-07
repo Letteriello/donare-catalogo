@@ -78,21 +78,69 @@ export default function CategoryManager() {
   const handleUpdateCategory = async (e, formData) => {
     e.preventDefault();
     try {
-      await Category.update(editingCategory.id, formData);
-      await loadCategories();
+      console.log('Tentando atualizar categoria com ID:', editingCategory.id, 'Dados:', formData);
+      setIsLoading(true);
+      
+      // Verificar se o ID existe no Firebase antes de atualizar
+      const categoryExists = await Category.get(editingCategory.id);
+      if (!categoryExists) {
+        console.error('Categoria não encontrada para atualização');
+        alert('Erro: Categoria não encontrada. Tente recarregar a página.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Preservar o ID e ordem ao atualizar
+      const updatedData = {
+        ...formData,
+        id: editingCategory.id,
+        order: editingCategory.order || 0
+      };
+      
+      await Category.update(editingCategory.id, updatedData);
+      console.log('Categoria atualizada com sucesso');
+      
+      // Atualizar o estado local para resposta imediata
+      setCategories(prev => 
+        prev.map(cat => cat.id === editingCategory.id ? {...cat, ...updatedData} : cat)
+      );
+      
       setEditingCategory(null);
     } catch (error) {
       console.error("Erro ao atualizar categoria:", error);
+      alert(`Erro ao atualizar categoria: ${error.message || 'Erro desconhecido'}. Você tem permissões de administrador?`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleDeleteCategory = async (categoryId) => {
     if (window.confirm("Tem certeza que deseja excluir esta categoria?")) {
       try {
+        console.log('Tentando excluir categoria com ID:', categoryId);
+        // Adicionar feedback visual de loading
+        setIsLoading(true);
+        
+        // Obter documento para verificar se existe antes de tentar excluir
+        const categoryExists = await Category.get(categoryId);
+        if (!categoryExists) {
+          console.error('Categoria não encontrada para exclusão');
+          alert('Erro: Categoria não encontrada. Tente recarregar a página.');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Tentar excluir a categoria
         await Category.delete(categoryId);
-        await loadCategories();
+        console.log('Categoria excluída com sucesso');
+        
+        // Atualizar a lista local
+        setCategories(prev => prev.filter(cat => cat.id !== categoryId));
       } catch (error) {
         console.error("Erro ao excluir categoria:", error);
+        alert(`Erro ao excluir categoria: ${error.message || 'Erro desconhecido'}. Você tem permissões de administrador?`);
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -275,14 +323,37 @@ export default function CategoryManager() {
     );
   }
 
-  const handleDragEnd = (result) => {
+  const handleDragEnd = async (result) => {
     if (!result.destination) return;
 
-    const items = Array.from(categories);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
+    try {
+      // Obter a lista atual e reorganizar localmente primeiro
+      const items = Array.from(categories);
+      const [reorderedItem] = items.splice(result.source.index, 1);
+      items.splice(result.destination.index, 0, reorderedItem);
 
-    setCategories(items);
+      // Atualizar a interface imediatamente para feedback visual
+      setCategories(items);
+      
+      // Atualizar cada item com sua nova ordem no Firebase
+      const updatePromises = items.map(async (category, index) => {
+        try {
+          // Atualizar apenas o campo 'order' para cada categoria
+          await Category.update(category.id, { ...category, order: index });
+          console.log(`Ordem da categoria ${category.name} atualizada para ${index}`);
+        } catch (error) {
+          console.error(`Erro ao atualizar ordem da categoria ${category.name}:`, error);
+        }
+      });
+      
+      // Aguardar todas as atualizações completarem
+      await Promise.all(updatePromises);
+      console.log('Todas as ordens de categorias foram atualizadas');
+    } catch (error) {
+      console.error('Erro ao reorganizar categorias:', error);
+      // Recarregar as categorias originais em caso de erro
+      loadCategories();
+    }
   };
 
   return (
