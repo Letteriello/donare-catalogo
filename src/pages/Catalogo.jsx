@@ -48,9 +48,9 @@ export default function Catalogo() {
             // Carregar produtos
             const allProducts = await Product.list();
             
-            // Filtrar produtos pela categoria
+            // Filtrar produtos pela categoria - CORRIGIDO
             const filteredProducts = allProducts.filter(product => 
-              product.category === categoryData?.id
+              product.categoryId === categoryData?.id
             );
             
             setProducts(filteredProducts);
