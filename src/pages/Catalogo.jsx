@@ -23,39 +23,45 @@ export default function Catalogo() {
         const urlParams = new URLSearchParams(location.search);
         const categoryId = urlParams.get("categoria");
         
-        // Remova a verificação que estava causando o erro
-        // if (!categoryId) {
-        //   setError("Categoria não especificada");
-        //   setIsLoading(false);
-        //   return;
-        // }
-
+        // Adicionar logs para depuração
+        console.log("[DEBUG] Parâmetro categoria na URL:", categoryId);
+        
         try {
           // Carregar categorias
           const categories = await Category.list();
+          console.log("[DEBUG] Categorias carregadas:", categories);
+          
+          // Carregar todos os produtos primeiro
+          const allProducts = await Product.list();
+          console.log("[DEBUG] Produtos carregados:", allProducts);
           
           if (categoryId) {
-            // Encontrar a categoria atual (verificando se categoryId existe)
+            // Encontrar a categoria atual com correspondência mais flexível
             const categoryData = categories.find(cat => 
               cat.id === categoryId || 
               (cat.id && cat.id.toLowerCase() === categoryId.toLowerCase()) ||
               (cat.name && cat.name.toLowerCase().replace(/ /g, '_') === categoryId.toLowerCase())
             );
             
+            console.log("[DEBUG] Categoria encontrada:", categoryData);
             setCategory(categoryData);
             
-            // Carregar produtos
-            const allProducts = await Product.list();
-            
-            // Filtrar produtos pela categoria - CORRIGIDO
-            const filteredProducts = allProducts.filter(product => 
-              product.categoryId === categoryData?.id
-            );
-            
-            setProducts(filteredProducts);
+            if (categoryData?.id) {
+              // Filtrar produtos pela categoria com log para verificar
+              const filteredProducts = allProducts.filter(product => {
+                console.log("[DEBUG] Verificando produto:", product.name, "categoryId:", product.categoryId, "comparando com:", categoryData.id);
+                return product.categoryId === categoryData.id;
+              });
+              
+              console.log("[DEBUG] Produtos filtrados:", filteredProducts);
+              setProducts(filteredProducts);
+            } else {
+              console.log("[AVISO] Categoria não encontrada, mostrando todos os produtos");
+              setProducts(allProducts);
+            }
           } else {
             // Se não houver categoria especificada, mostrar todos os produtos
-            const allProducts = await Product.list();
+            console.log("[DEBUG] Nenhuma categoria especificada, mostrando todos os produtos");
             setProducts(allProducts);
           }
           
