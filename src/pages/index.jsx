@@ -19,6 +19,11 @@ const PAGES = {
 }
 
 function _getCurrentPage(url) {
+    // Se for a rota raiz, retorne explicitamente LandingBio
+    if (url === '/' || url === '') {
+        return 'LandingBio';
+    }
+    
     if (url.endsWith('/')) {
         url = url.slice(0, -1);
     }
@@ -27,8 +32,20 @@ function _getCurrentPage(url) {
         urlLastPart = urlLastPart.split('?')[0];
     }
 
-    const pageName = Object.keys(PAGES).find(page => page.toLowerCase() === urlLastPart.toLowerCase());
-    return pageName || Object.keys(PAGES)[0];
+    // Mapeamento explícito de URLs para nomes de página
+    const urlToPageMap = {
+        'catalog': 'Catalog',
+        'home': 'Home',
+        'produto': 'ProdutoDetalhe',
+        'admin': 'Admin',
+        'contato': 'Contato'
+    };
+
+    // Verificar no mapa ou buscar pelo nome da página
+    const pageName = urlToPageMap[urlLastPart.toLowerCase()] || 
+                   Object.keys(PAGES).find(page => page.toLowerCase() === urlLastPart.toLowerCase());
+    
+    return pageName || 'LandingBio';
 }
 
 // Create a wrapper component that uses useLocation inside the Router context
