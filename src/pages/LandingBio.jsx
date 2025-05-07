@@ -31,7 +31,7 @@ export default function LandingBio() {
       id: 'catalog', 
       icon: <FileText size={20} />, 
       label: "Ver Catálogo", 
-      url: "/catalog", 
+      url: "/home", 
       primary: true 
     },
     { 

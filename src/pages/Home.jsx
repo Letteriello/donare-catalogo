@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { Category, User } from "@/api/entities";
 
 // Icons
-import { ArrowRight, Lock, Settings, RefreshCw, LogOut } from "lucide-react";
+import { ArrowRight, Lock, Settings, RefreshCw, LogOut, ChevronLeft } from "lucide-react";
 
 export default function Home() {
   const [categories, setCategories] = useState([]);
@@ -166,6 +166,17 @@ export default function Home() {
             
             {renderAdminControls()}
           </div>
+          
+          {/* Botão para voltar para a página inicial */}
+          <div className="mt-4">
+            <Link 
+              to="/"
+              className="inline-flex items-center px-4 py-2 bg-white/80 rounded-xl shadow-sm hover:shadow hover:bg-white transition-all group text-[#0B1F3A]/70 hover:text-[#0B1F3A]"
+            >
+              <ChevronLeft size={16} className="mr-2 transition-transform group-hover:-translate-x-1" />
+              <span className="font-medium">Voltar para Página Inicial</span>
+            </Link>
+          </div>
         </header>
 
         {/* Main Content */}
@@ -200,7 +211,7 @@ export default function Home() {
                     className="mb-5"
                   >
                     <Link
-                      to={`/catalogo?categoria=${category.id}`}
+                      to={`/catalog?categoria=${category.id}`}
                       className="block bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all"
                     >
                       <div className="flex justify-between items-center">

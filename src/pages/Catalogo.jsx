@@ -108,13 +108,23 @@ export default function Catalogo() {
     <div className="min-h-screen bg-[#F4F1EC]">
       <div className="container mx-auto px-4 py-8">
         {/* Navegação */}
-        <Link 
-          to={createPageUrl("Home")}
-          className="inline-flex items-center px-6 py-3 bg-white rounded-xl shadow-md hover:shadow-lg transition-all group text-[#0B1F3A] hover:bg-[#0B1F3A] hover:text-white"
-        >
-          <ChevronLeft size={20} className="mr-2 transition-transform group-hover:-translate-x-1" />
-          <span className="font-medium">Voltar para Categorias</span>
-        </Link>
+        <div className="flex flex-wrap gap-3 mb-8">
+          <Link 
+            to="/home"
+            className="inline-flex items-center px-6 py-3 bg-white rounded-xl shadow-md hover:shadow-lg transition-all group text-[#0B1F3A] hover:bg-[#0B1F3A] hover:text-white"
+          >
+            <ChevronLeft size={20} className="mr-2 transition-transform group-hover:-translate-x-1" />
+            <span className="font-medium">Voltar para Categorias</span>
+          </Link>
+
+          <Link 
+            to="/"
+            className="inline-flex items-center px-6 py-3 bg-white/50 rounded-xl shadow-sm hover:shadow hover:bg-white transition-all group text-[#0B1F3A]/80 hover:text-[#0B1F3A]"
+          >
+            <ChevronLeft size={16} className="mr-2 transition-transform group-hover:-translate-x-1" />
+            <span className="font-medium">Página Inicial</span>
+          </Link>
+        </div>
 
         {/* Estado de Carregamento */}
         {isLoading ? (
