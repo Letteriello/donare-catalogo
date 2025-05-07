@@ -1,39 +1,38 @@
-# Estágio de Build
-FROM node:18-alpine as build
+# Imagem base
+FROM node:18-alpine
 
 # Diretório de trabalho
 WORKDIR /app
 
-# Copiar arquivos de configuração de dependências
+# Copiar arquivos do projeto
 COPY package*.json ./
-COPY .env.example ./
 
 # Instalar dependências
-RUN npm ci
+RUN npm install
 
-# Copiar código-fonte
-COPY . .
+# Copiar o resto dos arquivos
+COPY . ./
 
-# Gerar arquivo .env a partir do .env.example (substituindo valores default)
-RUN node -e "const fs = require('fs'); \
-    const envExample = fs.readFileSync('.env.example', 'utf8'); \
-    fs.writeFileSync('.env', envExample.replace(/your_.*_here/g, ''));"
+# Definir variáveis de ambiente padrão
+ENV VITE_OLIST_API_TOKEN=15e1c07a36aef142a17114caf354c42ad3daeb673bedb496d34357ad486fad53
+ENV VITE_TINY_INTEGRATOR_ID=8471
+ENV VITE_TINY_API_TOKEN=15e1c07a36aef142a17114caf354c42ad3daeb673bedb496d34357ad486fad53
+ENV VITE_FIREBASE_API_KEY=AIzaSyAJ9cw5uNQGFd4VH13cD_WgxE1PLaC4DdM
+ENV VITE_FIREBASE_AUTH_DOMAIN=donare-catalogo.firebaseapp.com
+ENV VITE_FIREBASE_PROJECT_ID=donare-catalogo
+ENV VITE_FIREBASE_STORAGE_BUCKET=donare-catalogo.appspot.com
+ENV VITE_FIREBASE_MSG_SENDER_ID=12091397107
+ENV VITE_FIREBASE_APP_ID=1:12091397107:web:c19ef6fe250cdb6778f886
+ENV VITE_FIREBASE_MEASUREMENT_ID=G-15BG5CH1VW
+ENV VITE_API_MODE=production
+ENV VITE_OLIST_BASE_URL=https://api.olist.com
+ENV VITE_OLIST_API_VERSION=v3
 
-# Build do projeto
+# Build do app
 RUN npm run build
 
-# Estágio de Produção
-FROM nginx:alpine
+# Expor porta do servidor de desenvolvimento
+EXPOSE 3000
 
-# Copiar configuração personalizada do Nginx
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Configuração para SPA (Single Page Application)
-RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d
-
-# Expor a porta HTTP
-EXPOSE 80
-
-# Iniciar Nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Comando para executar o servidor
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]
