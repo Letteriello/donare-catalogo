@@ -71,7 +71,7 @@ export default function LandingBio() {
           <div className="mb-4 flex justify-center">
             <div className="rounded-full w-32 h-32 p-0.5 border-2 border-[#0B1F3A] overflow-hidden flex items-center justify-center bg-white shadow-sm">
               <img 
-                src="/img/logo.svg" 
+                src="/img/Logo Donare Home (1).png" 
                 alt="Donare Home" 
                 className="h-28 w-28 object-contain"
                 onError={(e) => {
