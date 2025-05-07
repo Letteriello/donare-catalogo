@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Product } from "@/api/entities";
 import { Category } from "@/api/entities";
@@ -13,7 +13,6 @@ export default function Catalogo() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const location = useLocation();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const loadData = async () => {
