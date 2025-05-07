@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
 // Utils & Data
-import { createPageUrl } from "@/utils";
+// import { createPageUrl } from "@/utils"; - Não necessário mais
 import { Category, User } from "@/api/entities";
 
 // Icons
@@ -195,7 +195,7 @@ export default function Home() {
                     className="mb-5"
                   >
                     <Link
-                      to={`${createPageUrl(category.slug)}`}
+                      to={`/catalogo?categoria=${category.id}`}
                       className="block bg-white rounded-xl p-6 shadow-sm hover:shadow-md transition-all"
                     >
                       <div className="flex justify-between items-center">
