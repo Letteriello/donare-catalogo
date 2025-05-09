@@ -4,8 +4,11 @@ import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Product } from "@/api/entities";
 import { Category } from "@/api/entities";
-import { ChevronLeft, RefreshCw } from "lucide-react";
+import { ChevronLeft, RefreshCw, Home } from "lucide-react"; // Added Home icon
 import { motion } from "framer-motion";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
 
 export default function Catalogo() {
   const [products, setProducts] = useState([]);
@@ -13,6 +16,7 @@ export default function Catalogo() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const location = useLocation();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     setIsLoading(true);
@@ -43,8 +47,8 @@ export default function Catalogo() {
         
         if (categoryId) {
           // Encontrar a categoria atual com correspondência mais flexível
-          const categoryData = categories.find(cat => 
-            cat.id === categoryId || 
+          const categoryData = categories.find(cat =>
+            cat.id === categoryId ||
             (cat.id && cat.id.toLowerCase() === categoryId.toLowerCase()) ||
             (cat.name && cat.name.toLowerCase().replace(/ /g, '_') === categoryId.toLowerCase())
           );
@@ -130,31 +134,73 @@ export default function Catalogo() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F1EC]">
-      <div className="container mx-auto px-4 py-8">
-        {/* Navegação */}
-        <div className="flex flex-wrap gap-3 mb-8">
-          <Link 
-            to="/home"
-            className="inline-flex items-center px-6 py-3 bg-white rounded-xl shadow-md hover:shadow-lg transition-all group text-[#0B1F3A] hover:bg-[#0B1F3A] hover:text-white"
-          >
-            <ChevronLeft size={20} className="mr-2 transition-transform group-hover:-translate-x-1" />
-            <span className="font-medium">Voltar para Categorias</span>
-          </Link>
+    <div className="min-h-screen bg-[#F4F1EC] bg-[url('/img/subtle-pattern.png')] bg-opacity-50">
+      <div className="container mx-auto px-4 py-8 relative">
+        {/* Elemento visual decorativo */}
+        <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-[#0B1F3A]/5 rounded-full -z-10 blur-3xl"></div>
+        <div className="hidden md:block absolute bottom-0 left-0 w-48 h-48 bg-[#B9A67E]/10 rounded-full -z-10 blur-3xl"></div>
+        {/* Navegação Aprimorada */}
+        <div className={`${isMobile ? 'sticky top-0 z-10 px-3 py-4 -mx-4 mb-6 bg-[#F4F1EC]/95 backdrop-blur-sm shadow-sm' : 'mb-8'}`}>
+          <div className={`flex ${isMobile ? 'justify-between w-full' : 'flex-wrap gap-3'}`}>
+            <Button
+              asChild
+              size={isMobile ? "xl" : "default"}
+              className={`${isMobile ? 'flex-1 mr-2' : ''} bg-[#0B1F3A] text-white rounded-xl shadow-md hover:bg-[#0A1A30] transition-all group min-h-[48px]`}
+            >
+              <Link to="/home">
+                <ChevronLeft size={isMobile ? 22 : 20} className={`${isMobile ? '' : 'mr-2'} transition-transform group-hover:-translate-x-1`} />
+                {!isMobile && <span className="font-medium">Voltar para Categorias</span>}
+              </Link>
+            </Button>
 
-          <Link 
-            to="/"
-            className="inline-flex items-center px-6 py-3 bg-white/50 rounded-xl shadow-sm hover:shadow hover:bg-white transition-all group text-[#0B1F3A]/80 hover:text-[#0B1F3A]"
-          >
-            <ChevronLeft size={16} className="mr-2 transition-transform group-hover:-translate-x-1" />
-            <span className="font-medium">Página Inicial</span>
-          </Link>
+            <Button
+              asChild
+              variant="outline"
+              size={isMobile ? "xl" : "default"}
+              className={`${isMobile ? 'flex-1' : ''} bg-white text-[#0B1F3A] hover:bg-[#0B1F3A]/10 rounded-xl shadow-sm group transition-all min-h-[48px]`}
+            >
+              <Link to="/">
+                {isMobile ? (
+                  <div className="flex items-center justify-center w-full">
+                    <Home size={22} className="transition-transform group-hover:scale-110" />
+                  </div>
+                ) : (
+                  <>
+                    <Home size={16} className="mr-2 transition-transform group-hover:scale-110" />
+                    <span className="font-medium">Página Inicial</span>
+                  </>
+                )}
+              </Link>
+            </Button>
+          </div>
+          
+          {/* Título da Categoria em Mobile - Move para dentro da navegação fixa */}
+          {isMobile && category && (
+            <h1 className="font-belleza text-xl text-center text-[#0B1F3A] mt-2 truncate px-6">
+              {category.name}
+            </h1>
+          )}
         </div>
 
-        {/* Estado de Carregamento */}
+        {/* Estado de Carregamento Aprimorado */}
         {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#0B1F3A]"></div>
+          <div className={`grid ${isMobile ? 'grid-cols-1 gap-8' : 'grid-cols-2 lg:grid-cols-3 gap-6'}`}>
+            {[...Array(isMobile ? 2 : 6)].map((_, index) => (
+              <div key={index} className="bg-white rounded-xl overflow-hidden shadow-md relative">
+                {/* Adiciona um overlay com gradiente para dar um aspecto mais sofisticado */}
+                <div className="absolute inset-0 bg-gradient-to-br from-[#0B1F3A]/5 to-transparent animate-pulse"></div>
+                <Skeleton className={`${isMobile ? 'h-72' : 'h-64'} w-full`} />
+                <div className="p-6">
+                  <Skeleton className="h-8 w-3/4 mb-3" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-5/6 mb-4" />
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-6 w-1/3" />
+                    {isMobile && <Skeleton className="h-4 w-1/4" />}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6 text-center">
@@ -169,49 +215,77 @@ export default function Catalogo() {
           </div>
         ) : (
           <>
-            {/* Título da Categoria */}
-            {category && (
-              <div className="text-center mb-12">
-                <h1 className="font-belleza text-3xl md:text-4xl text-[#0B1F3A] mb-2">{category.name}</h1>
+            {/* Título da Categoria com Design Aprimorado - apenas para desktop */}
+            {!isMobile && category && (
+              <div className="text-center mb-12 relative">
+                <div className="absolute left-0 right-0 top-1/2 border-t border-[#0B1F3A]/10 -z-10"></div>
+                <h1 className="font-belleza text-3xl md:text-4xl text-[#0B1F3A] mb-2 inline-block bg-[#F4F1EC] px-6">
+                  {category.name}
+                </h1>
                 {category.description && (
-                  <p className="text-[#0B1F3A]/70">{category.description}</p>
+                  <p className="text-[#0B1F3A]/70 max-w-2xl mx-auto mt-3">
+                    {category.description}
+                  </p>
                 )}
+                <div className="w-24 h-1 bg-gradient-to-r from-transparent via-[#B9A67E] to-transparent mx-auto mt-4"></div>
               </div>
             )}
 
-            {/* Lista de Produtos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {products.map(product => (
-                <motion.div
-                  key={product.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all"
-                >
-                  <Link to={`${createPageUrl("ProdutoDetalhe")}?id=${product.id}`}>
-                    <div className="h-64 overflow-hidden">
-                      <img 
-                        src={product.main_image} 
-                        alt={product.name} 
-                        className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
-                      />
-                    </div>
-                    <div className="p-6">
-                      <h3 className="font-belleza text-xl text-[#0B1F3A] mb-2">{product.name}</h3>
-                      <p className="text-[#0B1F3A]/70 text-sm line-clamp-2 mb-4">{product.description}</p>
-                      <span className="text-[#0B1F3A] font-medium">
-                        {product.price != null ? `R$ ${product.price.toFixed(2)}` : "Sob consulta"}
-                      </span>
-                    </div>
-                  </Link>
-                </motion.div>
+            {/* Lista de Produtos - Layout otimizado para mobile */}
+                <div className={`grid ${isMobile ? 'grid-cols-1 gap-8' : 'grid-cols-2 lg:grid-cols-3 gap-6'}`}>
+                  {products.map(product => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1"
+                    >
+                      <Link
+                        to={`${createPageUrl("ProdutoDetalhe")}?id=${product.id}`}
+                        className="block min-h-[48px]" // Aumenta área clicável
+                      >
+                        <div className={`${isMobile ? 'h-72' : 'h-64'} overflow-hidden`}>
+                          <img
+                            src={product.main_image}
+                            alt={product.name}
+                            className="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-110"
+                            loading="lazy" // Otimização de carregamento
+                          />
+                        </div>
+                        <div className={`p-6 ${isMobile ? 'pb-8' : ''}`}>
+                          <h3 className="font-belleza text-xl sm:text-2xl text-[#0B1F3A] mb-2">{product.name}</h3>
+                          <p className="text-[#0B1F3A]/80 text-sm md:text-base line-clamp-2 mb-4">{product.description}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[#0B1F3A] font-semibold text-lg">
+                              {product.price != null ? `R$ ${product.price.toFixed(2)}` : "Sob consulta"}
+                            </span>
+                            {isMobile && (
+                              <span className="text-sm text-[#0B1F3A]/60 underline">Ver detalhes</span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    </motion.div>
               ))}
             </div>
 
-            {/* Mensagem quando não há produtos */}
+            {/* Mensagem quando não há produtos - Com melhor design */}
             {products.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-[#0B1F3A]/70">Nenhum produto encontrado nesta categoria.</p>
+              <div className="text-center py-16 bg-white/50 rounded-xl border border-[#0B1F3A]/10 backdrop-blur-sm">
+                <div className="max-w-md mx-auto px-6">
+                  <h3 className="font-belleza text-xl text-[#0B1F3A] mb-3">Nenhum produto encontrado</h3>
+                  <p className="text-[#0B1F3A]/70 mb-6">
+                    Ainda não temos produtos cadastrados nesta categoria, mas estamos trabalhando para adicionar novidades em breve.
+                  </p>
+                  <Button
+                    asChild
+                    className="bg-[#0B1F3A] text-white hover:bg-[#0B1F3A]/90"
+                  >
+                    <Link to="/home">
+                      Explorar outras categorias
+                    </Link>
+                  </Button>
+                </div>
               </div>
             )}
           </>

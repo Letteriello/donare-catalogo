@@ -1,8 +1,8 @@
-
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
+import PropTypes from "prop-types"; // Added import
 import { Product } from "@/api/entities";
 import { Category } from "@/api/entities";
-import { X, Plus, Loader2, Upload, Trash2, Edit, Search, ChevronLeft, ChevronRight, GripVertical, ChevronDown, ChevronUp, Camera, Save } from "lucide-react";
+import { X, Plus, Loader2, Upload, Trash2, Edit, Search, GripVertical, ChevronDown, ChevronUp, Camera, Save } from "lucide-react";
 import { UploadFile } from "@/api/integrations";
 import { motion, AnimatePresence } from "framer-motion";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
@@ -15,10 +15,16 @@ export default function AdminEditProduct({ onSave, onCancel }) {
     description: "",
     main_image: "",
     gallery: [],
-    category: "",
+    category: "", // This is categoryId
     subcategory: "",
     options: [],
-    price: "",
+    priceRetail: "", // Renamed from price
+    priceWholesale: "", // New field
+    dimensions: { // New field group
+      height: "",
+      width: "",
+      length: ""
+    },
     whatsapp_link: "",
     is_new: false,
     is_limited: false,
@@ -28,7 +34,6 @@ export default function AdminEditProduct({ onSave, onCancel }) {
   const [isLoading, setIsLoading] = useState(false);
   const [isProductsLoading, setIsProductsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [currentOption, setCurrentOption] = useState("");
   const [imageUploading, setImageUploading] = useState(false);
   const [imageProgress, setImageProgress] = useState(0);
   const [isCreating, setIsCreating] = useState(false);
@@ -80,13 +85,27 @@ export default function AdminEditProduct({ onSave, onCancel }) {
       // Cria uma cópia do formData para ajustar campos antes de enviar
       const productData = { ...formData };
       
-      // Converte preço vazio para null para evitar problemas no banco
-      if (productData.price === "" || productData.price === undefined) {
-        productData.price = null;
+      // Convert retail price
+      if (productData.priceRetail === "" || productData.priceRetail === undefined) {
+        productData.priceRetail = null;
       } else {
-        // Converte para número se houver um valor
-        productData.price = Number(productData.price);
+        productData.priceRetail = Number(productData.priceRetail);
       }
+
+      // Convert wholesale price
+      if (productData.priceWholesale === "" || productData.priceWholesale === undefined) {
+        productData.priceWholesale = null;
+      } else {
+        productData.priceWholesale = Number(productData.priceWholesale);
+      }
+
+      // Convert dimensions, ensuring the dimensions object exists
+      productData.dimensions = productData.dimensions || {};
+      const { height, width, length } = productData.dimensions;
+
+      productData.dimensions.height = (height === "" || height === undefined) ? null : Number(height);
+      productData.dimensions.width = (width === "" || width === undefined) ? null : Number(width);
+      productData.dimensions.length = (length === "" || length === undefined) ? null : Number(length);
 
       if (selectedProduct) {
         await Product.update(selectedProduct.id, productData);
@@ -112,10 +131,16 @@ export default function AdminEditProduct({ onSave, onCancel }) {
       description: product.description || "",
       main_image: product.main_image || "",
       gallery: product.gallery || [],
-      category: product.category || "",
+      category: product.category || "", // This is categoryId
       subcategory: product.subcategory || "",
       options: product.options || [],
-      price: product.price || "",
+      priceRetail: product.priceRetail || product.price || "", // Fallback to old 'price' field if priceRetail is missing
+      priceWholesale: product.priceWholesale || "",
+      dimensions: {
+        height: product.dimensions?.height || "",
+        width: product.dimensions?.width || "",
+        length: product.dimensions?.length || ""
+      },
       whatsapp_link: product.whatsapp_link || "",
       is_new: product.is_new || false,
       is_limited: product.is_limited || false,
@@ -125,8 +150,8 @@ export default function AdminEditProduct({ onSave, onCancel }) {
   };
 
   // Modificar o componente de upload de imagem para suportar câmera
-  const ImageUploadButton = ({ id, onUpload, label, disabled }) => (
-    <div className="flex gap-2">
+  const ImageUploadButton = ({ id, onUpload, disabled }) => (
+    <div className="flex flex-col sm:flex-row gap-2">
       <input
         type="file"
         id={`${id}_file`}
@@ -161,6 +186,12 @@ export default function AdminEditProduct({ onSave, onCancel }) {
     </div>
   );
 
+ImageUploadButton.propTypes = {
+  id: PropTypes.string.isRequired,
+  onUpload: PropTypes.func.isRequired,
+  disabled: PropTypes.bool
+};
+
   const handleDeleteProduct = async (productId) => {
     if (window.confirm("Tem certeza que deseja excluir este produto?")) {
       try {
@@ -179,10 +210,16 @@ export default function AdminEditProduct({ onSave, onCancel }) {
       description: "",
       main_image: "",
       gallery: [],
-      category: "",
+      category: "", // This is categoryId
       subcategory: "",
       options: [],
-      price: "",
+      priceRetail: "",
+      priceWholesale: "",
+      dimensions: {
+        height: "",
+        width: "",
+        length: ""
+      },
       whatsapp_link: "",
       is_new: false,
       is_limited: false,
@@ -280,10 +317,9 @@ export default function AdminEditProduct({ onSave, onCancel }) {
   const handleProductDragEnd = (result) => {
     if (!result.destination) return;
     
-    const [sourceCategoryId, sourceIndex] = result.source.droppableId.split('-');
-    const [destCategoryId, destIndex] = result.destination.droppableId.split('-');
+    const [sourceCategoryId] = result.source.droppableId.split('-');
+    const [destCategoryId] = result.destination.droppableId.split('-');
     
-    const newProducts = [...products];
     
     if (sourceCategoryId === destCategoryId) {
       // Mover dentro da mesma categoria
@@ -304,7 +340,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
       setProducts([...updatedProducts, updatedProduct]);
       
       // Atualizar no banco de dados imediatamente quando muda de categoria
-      Product.update(productToMove.id, { 
+      Product.update(productToMove.id, {
         category: destCategoryId,
         display_order: result.destination.index
       })
@@ -319,9 +355,10 @@ export default function AdminEditProduct({ onSave, onCancel }) {
       // Atualizar a ordem de exibição de todos os produtos em cada categoria
       for (const categoryId in groupedProducts) {
         const categoryProducts = groupedProducts[categoryId];
-        const updatePromises = categoryProducts.map((product, index) => 
+        const updatePromises = categoryProducts.map((product, index) =>
           Product.update(product.id, { display_order: index })
         );
+      
         await Promise.all(updatePromises);
       }
       setHasOrderChanges(false);
@@ -377,6 +414,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
         setFormData(prev => ({ ...prev, gallery: [...prev.gallery, file_url] }));
       }
     } catch (error) {
+      console.error("Upload error:", error);
       setError("Erro ao fazer upload da imagem. Tente novamente.");
     } finally {
       setTimeout(() => {
@@ -388,12 +426,12 @@ export default function AdminEditProduct({ onSave, onCancel }) {
 
   if (isCreating) {
     return (
-      <div className="bg-white rounded-xl shadow-lg p-6">
+      <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-belleza text-[#0B1F3A]">
+          <h2 className="text-xl sm:text-2xl font-belleza text-[#0B1F3A]">
             {selectedProduct ? "Editar Produto" : "Novo Produto"}
           </h2>
-          <button 
+          <button
             onClick={() => {
               resetForm();
               setIsCreating(false);
@@ -423,7 +461,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                   name="name"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-lg"
+                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
                   required
                 />
               </div>
@@ -437,7 +475,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                   value={formData.description}
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   rows={5}
-                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-lg"
+                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
                   required
                 />
               </div>
@@ -452,14 +490,59 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                   value={formData.whatsapp_link}
                   onChange={(e) => setFormData({...formData, whatsapp_link: e.target.value})}
                   placeholder="https://wa.me/c/..."
-                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-lg"
+                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
                 />
-                <p className="mt-1 text-xs text-[#0B1F3A]/60">
-                  Cole aqui o link do produto compartilhado do WhatsApp Business
-                </p>
+              </div>
+            </div>
+
+            {/* New section for Dimensions */}
+            <div>
+              <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
+                Dimensões (cm)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="dimensionHeight" className="block text-xs font-medium text-[#0B1F3A]/80 mb-1">Altura</label>
+                  <input
+                    type="number"
+                    name="dimensionHeight"
+                    id="dimensionHeight"
+                    value={formData.dimensions.height}
+                    onChange={(e) => setFormData({...formData, dimensions: { ...formData.dimensions, height: e.target.value }})}
+                    step="0.1"
+                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
+                    placeholder="Ex: 10.5"
+                  />
+                </div>
+                </div>
+                <div>
+                  <label htmlFor="dimensionWidth" className="block text-xs font-medium text-[#0B1F3A]/80 mb-1">Largura</label>
+                  <input
+                    type="number"
+                    name="dimensionWidth"
+                    id="dimensionWidth"
+                    value={formData.dimensions.width}
+                    onChange={(e) => setFormData({...formData, dimensions: { ...formData.dimensions, width: e.target.value }})}
+                    step="0.1"
+                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
+                    placeholder="Ex: 15.0"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="dimensionLength" className="block text-xs font-medium text-[#0B1F3A]/80 mb-1">Comprimento</label>
+                  <input
+                    type="number"
+                    name="dimensionLength"
+                    id="dimensionLength"
+                    value={formData.dimensions.length}
+                    onChange={(e) => setFormData({...formData, dimensions: { ...formData.dimensions, length: e.target.value }})}
+                    step="0.1"
+                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
+                    placeholder="Ex: 20.2"
+                  />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
                     Categoria *
@@ -468,7 +551,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                     name="category"
                     value={formData.category}
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-lg"
+                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
                     required
                   >
                     <option value="">Selecione a Categoria</option>
@@ -482,16 +565,31 @@ export default function AdminEditProduct({ onSave, onCancel }) {
 
                 <div>
                   <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                    Preço
+                    Preço Varejo (R$)
                   </label>
                   <input
                     type="number"
-                    name="price"
-                    value={formData.price}
-                    onChange={(e) => setFormData({...formData, price: e.target.value})}
+                    name="priceRetail"
+                    value={formData.priceRetail}
+                    onChange={(e) => setFormData({...formData, priceRetail: e.target.value})}
                     step="0.01"
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-lg"
-                    placeholder="Deixe vazio para 'Sob consulta'"
+                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
+                    placeholder="Ex: 29.90"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
+                    Preço Atacado (R$)
+                  </label>
+                  <input
+                    type="number"
+                    name="priceWholesale"
+                    value={formData.priceWholesale}
+                    onChange={(e) => setFormData({...formData, priceWholesale: e.target.value})}
+                    step="0.01"
+                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
+                    placeholder="Ex: 19.90"
                   />
                 </div>
               </div>
@@ -546,16 +644,17 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                         {...provided.droppableProps}
                         className="relative bg-white p-4 rounded-xl border-2 border-dashed border-[#0B1F3A]/20 min-h-[200px]"
                       >
+                        <div className="flex flex-col sm:flex-row sm:items-center w-full">
                         {formData.main_image ? (
                           <Draggable
-                            draggableId="main-image"
+                            draggableId="main-image-draggable" // Changed to avoid conflict with droppableId
                             index={0}
                           >
-                            {(provided, snapshot) => (
+                            {(providedDraggable, snapshot) => ( // Renamed to avoid conflict with outer 'provided'
                               <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
+                                ref={providedDraggable.innerRef}
+                                {...providedDraggable.draggableProps}
+                                {...providedDraggable.dragHandleProps}
                                 className={`relative ${snapshot.isDragging ? 'z-50' : ''}`}
                               >
                                 <img
@@ -579,6 +678,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                             <p className="text-[#0B1F3A]/70">Arraste uma imagem da galeria ou faça upload</p>
                           </div>
                         )}
+                        </div>
                         {provided.placeholder}
                       </div>
                     )}
@@ -589,7 +689,6 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                       <ImageUploadButton
                         id="main_image"
                         onUpload={(e) => handleImageUpload(e, "main")}
-                        label="Imagem Principal"
                         disabled={imageUploading}
                       />
                     </div>
@@ -606,15 +705,15 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                   
                   <Droppable droppableId="gallery" direction="horizontal">
                     {(provided) => (
-                      <div 
+                      <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4"
                       >
                         {formData.gallery.map((image, index) => (
-                          <Draggable 
-                            key={`${image}-${index}`} 
-                            draggableId={`${image}-${index}`} 
+                          <Draggable
+                            key={`${image}-${index}`}
+                            draggableId={`${image}-${index}`}
                             index={index}
                           >
                             {(provided, snapshot) => (
@@ -626,15 +725,15 @@ export default function AdminEditProduct({ onSave, onCancel }) {
                                 }`}
                               >
                                 <div className="aspect-square">
-                                  <img 
-                                    src={image} 
-                                    alt={`Imagem ${index + 1}`} 
+                                  <img
+                                    src={image}
+                                    alt={`Imagem ${index + 1}`}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                                 
                                 <div className="absolute inset-x-0 top-0 p-2 bg-gradient-to-b from-black/50 to-transparent flex justify-between items-start">
-                                  <div 
+                                  <div
                                     {...provided.dragHandleProps}
                                     className="p-1.5 rounded-lg bg-white/20 backdrop-blur-sm cursor-grab active:cursor-grabbing"
                                   >
@@ -703,21 +802,21 @@ export default function AdminEditProduct({ onSave, onCancel }) {
             </DragDropContext>
           </div>
 
-          <div className="flex justify-end gap-4 pt-6 border-t border-[#0B1F3A]/10">
+          <div className="flex flex-col sm:flex-row sm:justify-end gap-4 pt-6 border-t border-[#0B1F3A]/10">
             <button
               type="button"
               onClick={() => {
                 resetForm();
                 setIsCreating(false);
               }}
-              className="px-6 py-3 text-lg border-2 border-[#0B1F3A]/20 rounded-xl hover:bg-[#F4F1EC] transition-colors"
+              className="w-full sm:w-auto px-4 py-2 text-base sm:px-6 sm:py-3 sm:text-lg border-2 border-[#0B1F3A]/20 rounded-xl hover:bg-[#F4F1EC] transition-colors"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={isLoading}
-              className="px-6 py-3 text-lg bg-[#0B1F3A] text-white rounded-xl hover:bg-[#0B1F3A]/90 transition-colors disabled:opacity-70 flex items-center"
+              className="w-full sm:w-auto px-4 py-2 text-base sm:px-6 sm:py-3 sm:text-lg bg-[#0B1F3A] text-white rounded-xl hover:bg-[#0B1F3A]/90 transition-colors disabled:opacity-70 flex items-center justify-center sm:justify-start"
             >
               {isLoading ? (
                 <>
@@ -736,12 +835,12 @@ export default function AdminEditProduct({ onSave, onCancel }) {
 
   // Lista de produtos
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6">
+    <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-belleza text-[#0B1F3A]">Produtos</h2>
-        <button 
+        <h2 className="text-xl sm:text-2xl font-belleza text-[#0B1F3A]">Produtos</h2>
+        <button
           onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#0B1F3A] text-white rounded-xl hover:bg-[#0B1F3A]/90 transition-all"
+          className="flex items-center gap-2 px-3 py-2 sm:px-4 text-sm sm:text-base bg-[#0B1F3A] text-white rounded-xl hover:bg-[#0B1F3A]/90 transition-all"
         >
           <Plus size={20} />
           Novo Produto
@@ -754,269 +853,178 @@ export default function AdminEditProduct({ onSave, onCancel }) {
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Buscar produtos..."
+          placeholder="Buscar por nome, descrição ou categoria..."
           className="w-full px-4 py-3 pl-10 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50"
         />
-        <Search className="absolute left-3 top-3.5 text-[#0B1F3A]/40" size={20} />
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#0B1F3A]/40" />
       </div>
 
-      {isProductsLoading ? (
-        <div className="p-8 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B1F3A] mx-auto mb-4"></div>
-          <p className="text-[#0B1F3A]/70">Carregando produtos...</p>
-        </div>
-      ) : products.length === 0 ? (
-        <div className="p-8 text-center bg-[#F4F1EC]/50 rounded-xl">
-          <p className="text-[#0B1F3A]/70">Nenhum produto cadastrado.</p>
-          <button 
-            onClick={() => setIsCreating(true)}
-            className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-[#0B1F3A] text-white rounded-xl hover:bg-[#0B1F3A]/90 transition-all"
+      {/* Botão Salvar Ordem */}
+      {hasOrderChanges && (
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={saveProductOrder}
+            disabled={isSavingOrder}
+            className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
           >
-            <Plus size={20} />
-            Criar Primeiro Produto
+            {isSavingOrder ? (
+              <>
+                <Loader2 className="animate-spin w-5 h-5" />
+                Salvando Ordem...
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                Salvar Ordem dos Produtos
+              </>
+            )}
           </button>
+        </div>
+      )}
+
+      {isProductsLoading ? (
+        <div className="flex justify-center items-center py-10">
+          <Loader2 className="animate-spin w-10 h-10 text-[#0B1F3A]" />
         </div>
       ) : (
         <DragDropContext onDragEnd={handleProductDragEnd}>
           <div className="space-y-6">
-            {categories.map(category => {
-              const categoryProducts = groupedProducts[category.id] || [];
-              if (categoryProducts.length === 0 && searchTerm) return null;
-              
+            {Object.entries(groupedProducts).map(([categoryId, categoryProducts]) => {
+              const categoryName = categoryId === "sem_categoria" ? "Sem Categoria" : formatCategory(categoryId);
+              const isExpanded = expandedCategories[categoryId];
+
               return (
-                <div key={category.id} className="border border-[#0B1F3A]/10 rounded-xl overflow-hidden">
-                  <div 
-                    className="bg-[#F4F1EC]/70 p-4 flex justify-between items-center cursor-pointer"
-                    onClick={() => toggleCategoryExpansion(category.id)}
+                <div key={categoryId} className="bg-[#FDFBF8] rounded-xl p-4 shadow-sm">
+                  <div
+                    className="flex justify-between items-center cursor-pointer"
+                    onClick={() => toggleCategoryExpansion(categoryId)}
                   >
-                    <h3 className="font-belleza text-xl text-[#0B1F3A]">
-                      {category.name} <span className="text-sm font-normal">({categoryProducts.length} produtos)</span>
-                    </h3>
-                    <button className="p-2 hover:bg-[#F4F1EC] rounded-full">
-                      {expandedCategories[category.id] ? (
-                        <ChevronUp size={20} className="text-[#0B1F3A]/60" />
-                      ) : (
-                        <ChevronDown size={20} className="text-[#0B1F3A]/60" />
-                      )}
-                    </button>
+                    <h3 className="text-lg font-belleza text-[#0B1F3A]">{categoryName} {categoryId !== "sem_categoria" && categoryName !== 'Categoria não encontrada' ? `(${categoryProducts.length})` : ''}</h3>
+                    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                   </div>
                   
-                  {expandedCategories[category.id] && (
-                    <Droppable droppableId={category.id}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className="divide-y divide-[#0B1F3A]/10"
-                        >
-                          {categoryProducts.length === 0 ? (
-                            <div className="p-4 text-center text-[#0B1F3A]/60">
-                              Nenhum produto nesta categoria
-                            </div>
-                          ) : (
-                            categoryProducts.map((product, index) => (
-                              <Draggable
-                                key={product.id}
-                                draggableId={product.id}
-                                index={index}
-                              >
-                                {(provided, snapshot) => (
-                                  <div
-                                    ref={provided.innerRef}
-                                    {...provided.draggableProps}
-                                    className={`flex items-center p-4 hover:bg-[#F4F1EC]/30 transition-colors ${
-                                      snapshot.isDragging ? 'bg-[#F4F1EC] shadow-lg' : ''
-                                    }`}
-                                  >
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <Droppable droppableId={categoryId} type="PRODUCT">
+                          {(provided) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.droppableProps}
+                              className="mt-4 space-y-3"
+                            >
+                              {categoryProducts.map((product, index) => (
+                                <Draggable key={product.id} draggableId={product.id} index={index}>
+                                  {(provided, snapshot) => (
                                     <div
-                                      {...provided.dragHandleProps}
-                                      className="p-2 cursor-grab active:cursor-grabbing"
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      className={`flex items-start gap-3 p-3 bg-white rounded-lg shadow-md transition-shadow ${
+                                        snapshot.isDragging ? 'shadow-xl' : ''
+                                      }`}
                                     >
-                                      <GripVertical size={20} className="text-[#0B1F3A]/40" />
-                                    </div>
-                                    
-                                    <div className="h-16 w-16 bg-white rounded-xl overflow-hidden flex-shrink-0 mr-4">
-                                      {product.main_image ? (
-                                        <img
-                                          src={product.main_image}
-                                          alt={product.name}
-                                          className="w-full h-full object-contain"
-                                        />
-                                      ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-[#F4F1EC]">
-                                          <span className="text-[#0B1F3A]/40 text-xs">Sem imagem</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="flex-1 min-w-0">
-                                      <h4 className="font-medium text-[#0B1F3A] truncate">{product.name}</h4>
-                                      <p className="text-[#0B1F3A]/60 text-sm truncate">{product.description}</p>
-                                    </div>
-                                    
-                                    <div className="text-right flex-shrink-0 ml-4">
-                                      <p className="font-medium text-[#0B1F3A]">
-                                        {product.price ? `R$ ${Number(product.price).toFixed(2)}` : "Sob consulta"}
-                                      </p>
-                                      {product.is_featured && (
-                                        <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Destacado</span>
-                                      )}
-                                    </div>
-                                    
-                                    <div className="flex ml-4 gap-2">
-                                      <button
-                                        onClick={() => handleEditProduct(product)}
-                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-full"
-                                        title="Editar produto"
+                                      <div
+                                        {...provided.dragHandleProps}
+                                        className="p-1.5 text-[#0B1F3A]/50 hover:text-[#0B1F3A] cursor-grab active:cursor-grabbing"
                                       >
-                                        <Edit size={20} />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteProduct(product.id)}
-                                        className="p-2 text-red-600 hover:bg-red-50 rounded-full"
-                                        title="Excluir produto"
-                                      >
-                                        <Trash2 size={20} />
-                                      </button>
+                                        <GripVertical size={20} />
+                                      </div>
+                                      
+                                      <div className="flex-shrink-0 w-20 h-20 rounded-md overflow-hidden bg-[#F4F1EC]">
+                                        {product.main_image ? (
+                                          <img
+                                            src={product.main_image}
+                                            alt={product.name}
+                                            className="w-full h-full object-cover"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-full flex items-center justify-center text-[#0B1F3A]/30">
+                                            <Camera size={32} />
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="flex-grow min-w-0">
+                                        <h4 className="text-base font-semibold text-[#0B1F3A] truncate">{product.name}</h4>
+                                        <p className="text-sm text-[#0B1F3A]/70 truncate">{product.description}</p>
+                                        <p className="text-xs text-[#0B1F3A]/50">
+                                          Preço: {product.price ? `R$ ${Number(product.price).toFixed(2)}` : 'Sob consulta'}
+                                        </p>
+                                      </div>
+                                      
+                                      <div className="flex flex-col sm:flex-row gap-2 items-center">
+                                        <button
+                                          onClick={() => handleEditProduct(product)}
+                                          className="p-2 text-[#0B1F3A]/70 hover:text-[#0B1F3A] hover:bg-[#F4F1EC] rounded-full transition-colors"
+                                          title="Editar Produto"
+                                        >
+                                          <Edit size={20} />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteProduct(product.id)}
+                                          className="p-2 text-red-500/70 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                          title="Excluir Produto"
+                                        >
+                                          <Trash2 size={20} />
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </Draggable>
-                            ))
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
+                            </div>
                           )}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  )}
+                        </Droppable>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               );
             })}
             
-            {/* Produtos sem categoria */}
-            {groupedProducts["sem_categoria"] && groupedProducts["sem_categoria"].length > 0 && (
-              <div className="border border-[#0B1F3A]/10 rounded-xl overflow-hidden">
-                <div 
-                  className="bg-[#F4F1EC]/70 p-4 flex justify-between items-center cursor-pointer"
-                  onClick={() => toggleCategoryExpansion("sem_categoria")}
-                >
-                  <h3 className="font-belleza text-xl text-[#0B1F3A]">
-                    Sem categoria <span className="text-sm font-normal">({groupedProducts["sem_categoria"].length} produtos)</span>
-                  </h3>
-                  <button className="p-2 hover:bg-[#F4F1EC] rounded-full">
-                    {expandedCategories["sem_categoria"] ? (
-                      <ChevronUp size={20} className="text-[#0B1F3A]/60" />
-                    ) : (
-                      <ChevronDown size={20} className="text-[#0B1F3A]/60" />
-                    )}
-                  </button>
-                </div>
-                
-                {expandedCategories["sem_categoria"] && (
-                  <Droppable droppableId="sem_categoria">
-                    {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="divide-y divide-[#0B1F3A]/10"
-                      >
-                        {groupedProducts["sem_categoria"].map((product, index) => (
-                          <Draggable
-                            key={product.id}
-                            draggableId={product.id}
-                            index={index}
-                          >
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className={`flex items-center p-4 hover:bg-[#F4F1EC]/30 transition-colors ${
-                                  snapshot.isDragging ? 'bg-[#F4F1EC] shadow-lg' : ''
-                                }`}
-                              >
-                                <div
-                                  {...provided.dragHandleProps}
-                                  className="p-2 cursor-grab active:cursor-grabbing"
-                                >
-                                  <GripVertical size={20} className="text-[#0B1F3A]/40" />
-                                </div>
-                                
-                                <div className="h-16 w-16 bg-white rounded-xl overflow-hidden flex-shrink-0 mr-4">
-                                  {product.main_image ? (
-                                    <img
-                                      src={product.main_image}
-                                      alt={product.name}
-                                      className="w-full h-full object-contain"
-                                    />
-                                  ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-[#F4F1EC]">
-                                      <span className="text-[#0B1F3A]/40 text-xs">Sem imagem</span>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-[#0B1F3A] truncate">{product.name}</h4>
-                                  <p className="text-[#0B1F3A]/60 text-sm truncate">{product.description}</p>
-                                </div>
-                                
-                                <div className="text-right flex-shrink-0 ml-4">
-                                  <p className="font-medium text-[#0B1F3A]">
-                                    {product.price ? `R$ ${Number(product.price).toFixed(2)}` : "Sob consulta"}
-                                  </p>
-                                </div>
-                                
-                                <div className="flex ml-4 gap-2">
-                                  <button
-                                    onClick={() => handleEditProduct(product)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-full"
-                                    title="Editar produto"
-                                  >
-                                    <Edit size={20} />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteProduct(product.id)}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-full"
-                                    title="Excluir produto"
-                                  >
-                                    <Trash2 size={20} />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                )}
+            {Object.keys(groupedProducts).length === 0 && !isProductsLoading && (
+              <div className="text-center py-10 text-[#0B1F3A]/60">
+                <p className="mb-2 text-lg">Nenhum produto encontrado.</p>
+                <p className="text-sm">
+                  {searchTerm ? "Tente refinar sua busca ou " : ""}
+                  <button
+                    onClick={() => {
+                      setSearchTerm(""); // Limpar busca
+                      setIsCreating(true); // Abrir formulário de novo produto
+                    }}
+                    className="text-[#0B1F3A] hover:underline font-semibold"
+                  >
+                    adicione um novo produto
+                  </button>.
+                </p>
               </div>
             )}
           </div>
         </DragDropContext>
       )}
-      {!isCreating && hasOrderChanges && (
-        <div className="fixed bottom-4 right-4 z-50">
+
+      {/* Botão de Cancelar (caso o usuário não queira salvar a ordem) */}
+      {onCancel && (
+        <div className="mt-8 flex justify-end">
           <button
-            onClick={saveProductOrder}
-            disabled={isSavingOrder}
-            className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-xl shadow-lg hover:bg-green-700 transition-all"
+            onClick={onCancel}
+            className="px-6 py-3 text-base border-2 border-[#0B1F3A]/20 rounded-xl hover:bg-[#F4F1EC] transition-colors"
           >
-            {isSavingOrder ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Salvando ordem...</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-5 h-5" />
-                <span>Salvar nova ordem</span>
-              </>
-            )}
+            Voltar
           </button>
         </div>
       )}
     </div>
   );
 }
+AdminEditProduct.propTypes = {
+  onSave: PropTypes.func,
+  onCancel: PropTypes.func
+};

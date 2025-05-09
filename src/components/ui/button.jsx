@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority";
+import PropTypes from "prop-types";
 
 import { cn } from "@/lib/utils"
 
@@ -24,6 +25,7 @@ const buttonVariants = cva(
         default: "h-9 px-4 py-2",
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-md px-8",
+        xl: "h-12 rounded-md px-6", // Larger tap target for mobile
         icon: "h-9 w-9",
       },
     },
@@ -45,4 +47,19 @@ const Button = React.forwardRef(({ className, variant, size, asChild = false, ..
 })
 Button.displayName = "Button"
 
+Button.propTypes = {
+  className: PropTypes.string,
+  variant: PropTypes.oneOf([
+    "default",
+    "destructive",
+    "outline",
+    "secondary",
+    "ghost",
+    "link",
+  ]),
+  size: PropTypes.oneOf(["default", "sm", "lg", "xl", "icon"]),
+  asChild: PropTypes.bool,
+};
+
+// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants }

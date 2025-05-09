@@ -28,7 +28,7 @@ export const Product = {
       }
       
       const snapshot = await getDocs(productsQuery);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
     } catch (error) {
       console.error('Erro ao listar produtos:', error);
       return [];
@@ -64,7 +64,7 @@ export const Product = {
       // Registra o listener e armazena a função de cancelamento
       const unsubscribe = onSnapshot(productsQuery, (snapshot) => {
         // Mapeia os documentos recebidos para o formato esperado
-        const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const products = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
         // Chama o callback fornecido com os dados atualizados
         callback(products);
@@ -87,7 +87,7 @@ export const Product = {
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() };
+        return { ...docSnap.data(), id: docSnap.id };
       } else {
         console.log('Produto não encontrado');
         return null;
@@ -114,12 +114,19 @@ export const Product = {
       const productToSave = {
         ...productData,
         categoryId: String(productData.categoryId),
+        priceRetail: productData.priceRetail || null,
+        priceWholesale: productData.priceWholesale || null,
+        dimensions: {
+          height: productData.dimensions?.height || null,
+          width: productData.dimensions?.width || null,
+          length: productData.dimensions?.length || null,
+        },
         createdAt: serverTimestamp()
       };
       
       const docRef = await addDoc(collection(db, 'products'), productToSave);
       console.log(`[DEBUG] Produto criado com ID: ${docRef.id}`);
-      return { id: docRef.id, ...productToSave };
+      return { ...productToSave, id: docRef.id };
     } catch (error) {
       console.error('Erro ao criar produto:', error);
       throw error;
@@ -154,9 +161,9 @@ export const Category = {
   list: async () => {
     try {
       // Primeiro, tentamos com getDocs para compatibilidade imediata
-      const simpleQuery = collection(db, 'categories');
-      const snapshot = await getDocs(simpleQuery);
-      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const categoriesQuery = query(collection(db, 'categories'), orderBy('order'));
+      const snapshot = await getDocs(categoriesQuery);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
     } catch (error) {
       console.error('Erro ao listar categorias:', error);
       return [];
@@ -166,13 +173,13 @@ export const Category = {
   // NOVO: Método para ouvir mudanças em tempo real nas categorias
   listenForChanges: (callback) => {
     try {
-      // Cria um listener em tempo real para a coleção de categorias
-      const categoriesCollection = collection(db, 'categories');
+      // Cria um listener em tempo real para a coleção de categorias, ordenado por 'order'
+      const categoriesQuery = query(collection(db, 'categories'), orderBy('order'));
       
       // Registra o listener e armazena a função de cancelamento
-      const unsubscribe = onSnapshot(categoriesCollection, (snapshot) => {
+      const unsubscribe = onSnapshot(categoriesQuery, (snapshot) => {
         // Mapeia os documentos recebidos para o formato esperado
-        const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const categories = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
         
         // Chama o callback fornecido com os dados atualizados
         callback(categories);
@@ -195,7 +202,7 @@ export const Category = {
       const docSnap = await getDoc(docRef);
       
       if (docSnap.exists()) {
-        return { id: docSnap.id, ...docSnap.data() };
+        return { ...docSnap.data(), id: docSnap.id };
       } else {
         console.log('Categoria não encontrada');
         return null;
@@ -209,7 +216,8 @@ export const Category = {
   create: async (categoryData) => {
     try {
       const docRef = await addDoc(collection(db, 'categories'), categoryData);
-      return { id: docRef.id, ...categoryData };
+      // Ensure Firestore's generated ID is the one returned, even if categoryData has an 'id' field.
+      return { ...categoryData, id: docRef.id };
     } catch (error) {
       console.error('Erro ao criar categoria:', error);
       throw error;
@@ -500,9 +508,10 @@ export const User = {
         const userDocRef = doc(db, 'users', snapshot.docs[0].id);
         await updateDoc(userDocRef, {
           ...userData,
-          updatedAt: new Date()
+          updatedAt: serverTimestamp()
         });
         
+        // Atualizar o User.current se o usuário modificado for o usuário logado
         if (User.current && User.current.uid === uid) {
           User.current = {
             ...User.current,
@@ -511,14 +520,45 @@ export const User = {
         }
         
         return { 
-          uid,
-          ...userData
+          id: snapshot.docs[0].id, 
+          ...userData 
         };
       } else {
+        console.error('Usuário não encontrado para atualização');
         throw new Error('Usuário não encontrado');
       }
     } catch (error) {
       console.error('Erro ao atualizar usuário:', error);
+      throw error;
+    }
+  },
+  
+  delete: async (uid) => {
+    try {
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('uid', '==', uid),
+        limit(1)
+      );
+      
+      const snapshot = await getDocs(usersQuery);
+      
+      if (!snapshot.empty) {
+        const userDocRef = doc(db, 'users', snapshot.docs[0].id);
+        await deleteDoc(userDocRef);
+        
+        // Limpar User.current se o usuário excluído for o usuário logado
+        if (User.current && User.current.uid === uid) {
+          User.current = null;
+        }
+        
+        return { success: true };
+      } else {
+        console.error('Usuário não encontrado para exclusão');
+        throw new Error('Usuário não encontrado');
+      }
+    } catch (error) {
+      console.error('Erro ao excluir usuário:', error);
       throw error;
     }
   }
