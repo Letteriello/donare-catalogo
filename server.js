@@ -1,9 +1,14 @@
-const express = require('express');
-const multer = require('multer');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import multer from 'multer';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// ES Modules não tem __dirname, então precisamos criá-lo
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
