@@ -11,7 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = 3001; // Forçar a porta 3001 para o servidor de upload
 
 // Middleware de log para todas as requisições recebidas
 app.use((req, res, next) => {
