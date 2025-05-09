@@ -11,7 +11,7 @@ export default [
     files: ['server.js'],
     languageOptions: {
       ecmaVersion: 2020,
-      sourceType: 'commonjs', // Especifica CommonJS para este arquivo
+      sourceType: 'module', // Especifica ES Modules para este arquivo
       globals: {
         ...globals.node, // Adiciona globais do Node.js (require, process, etc.)
       },

@@ -4,11 +4,8 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 
 // ES Modules não tem __dirname, então precisamos criá-lo
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = 3001; // Forçar a porta 3001 para o servidor de upload
@@ -106,6 +103,12 @@ app.post('/api/upload/:type', upload.single('file'), processUpload);
 
 // Rota para upload sem tipo específico (usará 'products' como padrão)
 app.post('/api/upload', upload.single('file'), processUpload);
+
+// Rota de teste simples para POST
+app.post('/testpost', (req, res) => {
+  console.log(`[SERVER.JS LOG] Received request on /testpost. Method: ${req.method}`);
+  res.json({ success: true, message: 'Test POST successful on /testpost' });
+});
 
 // Tratamento de erros
 app.use((err, req, res, _next) => {
