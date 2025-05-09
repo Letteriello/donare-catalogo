@@ -65,7 +65,7 @@ const upload = multer({
 });
 
 // Rota para upload de arquivo
-app.post('/:type?', upload.single('file'), (req, res) => {
+app.post('/api/upload/:type?', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
