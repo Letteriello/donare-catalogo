@@ -41,7 +41,15 @@ export async function UploadFile({ file, path = 'products' }) {
     }
     
     const data = await response.json();
-    return data; // Retorna { file_url: '...' }
+    
+    // O backend retorna um caminho relativo como /uploads/products/image.png
+    // O frontend constrói a URL completa.
+    // Em desenvolvimento, se o servidor de upload estiver em outra porta, window.location.origin pode não ser o correto
+    // para exibir a imagem diretamente, mas para armazenamento, o caminho relativo é o que importa.
+    // Para produção (Easypanel), window.location.origin será o domínio correto.
+    const absoluteFileUrl = `${window.location.origin}${data.file_url}`;
+    
+    return { ...data, file_url: absoluteFileUrl }; // Retorna { success: true, file_url: 'https://yourdomain.com/uploads/...' }
   } catch (error) {
     console.error('Erro ao fazer upload do arquivo:', error);
     throw error;

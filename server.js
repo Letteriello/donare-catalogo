@@ -71,14 +71,14 @@ app.post('/api/upload/:type?', upload.single('file'), (req, res) => {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
     
-    // Constrói a URL pública do arquivo
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const relativePath = req.file.path.replace('public', '');
-    const fileUrl = `${baseUrl}${relativePath.replace(/\\/g, '/')}`;
+    // Constrói um caminho relativo para o arquivo
+    // req.file.path é algo como "public/uploads/products/123-image.png"
+    // Precisamos transformá-lo em "/uploads/products/123-image.png"
+    const relativePath = req.file.path.replace(/^public[\\/]/, '/').replace(/\\/g, '/');
     
     res.json({
       success: true,
-      file_url: fileUrl,
+      file_url: relativePath, // O frontend irá prefixar com window.location.origin
       message: 'Arquivo enviado com sucesso',
     });
   } catch (error) {
