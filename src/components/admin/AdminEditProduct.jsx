@@ -15,7 +15,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
     description: "",
     main_image: "",
     gallery: [],
-    category: "", // This is categoryId
+    categoryId: "", // Era "category" anteriormente
     subcategory: "",
     options: [],
     priceRetail: "", // Renamed from price
@@ -131,7 +131,7 @@ export default function AdminEditProduct({ onSave, onCancel }) {
       description: product.description || "",
       main_image: product.main_image || "",
       gallery: product.gallery || [],
-      category: product.category || "", // This is categoryId
+      categoryId: product.categoryId || product.category || "", // Aceita tanto categoryId quanto category (para compatibilidade)
       subcategory: product.subcategory || "",
       options: product.options || [],
       priceRetail: product.priceRetail || product.price || "", // Fallback to old 'price' field if priceRetail is missing
@@ -210,7 +210,7 @@ ImageUploadButton.propTypes = {
       description: "",
       main_image: "",
       gallery: [],
-      category: "", // This is categoryId
+      categoryId: "", // Renomeado de 'category' para 'categoryId' para corresponder ao backend
       subcategory: "",
       options: [],
       priceRetail: "",
@@ -228,9 +228,10 @@ ImageUploadButton.propTypes = {
   };
 
   // Função para formatar categorias
-  const formatCategory = (categoryId) => {
-    if (!categoryId || !categories) return 'Categoria não encontrada';
-    const foundCategory = categories.find(cat => cat.id === categoryId);
+  // Função para formatar categorias - aceita tanto category quanto categoryId por compatibilidade
+  const formatCategory = (categoryIdOrCategory) => {
+    if (!categoryIdOrCategory || !categories) return 'Categoria não encontrada';
+    const foundCategory = categories.find(cat => cat.id === categoryIdOrCategory);
     return foundCategory ? foundCategory.name : 'Categoria não encontrada';
   };
 
@@ -239,14 +240,15 @@ ImageUploadButton.propTypes = {
     return (
       product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (product.category && formatCategory(product.category).toLowerCase().includes(searchTerm.toLowerCase()))
+      ((product.categoryId || product.category) && formatCategory(product.categoryId || product.category).toLowerCase().includes(searchTerm.toLowerCase()))
     );
   });
 
   // Agrupar produtos por categoria
   const groupedProducts = {};
   filteredProducts.forEach(product => {
-    const categoryId = product.category || "sem_categoria";
+    // Usa categoryId se disponível, senão cai para o campo category legado
+    const categoryId = product.categoryId || product.category || "sem_categoria";
     if (!groupedProducts[categoryId]) {
       groupedProducts[categoryId] = [];
     }
@@ -328,20 +330,20 @@ ImageUploadButton.propTypes = {
       categoryProducts.splice(result.destination.index, 0, movedProduct);
       
       // Atualizar o array de produtos
-      const updatedProducts = products.filter(p => p.category !== sourceCategoryId);
+      const updatedProducts = products.filter(p => (p.categoryId || p.category) !== sourceCategoryId);
       setProducts([...updatedProducts, ...categoryProducts]);
       setHasOrderChanges(true);
     } else {
       // Mover entre categorias
       const productToMove = groupedProducts[sourceCategoryId][result.source.index];
-      const updatedProduct = { ...productToMove, category: destCategoryId };
+      const updatedProduct = { ...productToMove, categoryId: destCategoryId };
       
       const updatedProducts = products.filter(p => p.id !== productToMove.id);
       setProducts([...updatedProducts, updatedProduct]);
       
       // Atualizar no banco de dados imediatamente quando muda de categoria
       Product.update(productToMove.id, {
-        category: destCategoryId,
+        categoryId: destCategoryId,
         display_order: result.destination.index
       })
         .then(() => loadProducts())
@@ -550,9 +552,9 @@ ImageUploadButton.propTypes = {
                     Categoria *
                   </label>
                   <select
-                    name="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    name="categoryId"
+                    value={formData.categoryId}
+                    onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
                     className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
                     required
                   >
