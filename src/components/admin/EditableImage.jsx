@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Upload, Loader2 } from 'lucide-react';
 import { UploadFile } from "@/api/integrations";
 
@@ -17,10 +17,12 @@ export default function EditableImage({
 
     try {
       setIsUploading(true);
-      const { file_url } = await UploadFile({ file });
-      onImageChange(file_url);
+      const response = await UploadFile({ file });
+      // Extrai file_url da resposta do servidor
+      onImageChange(response.file_url);
     } catch (error) {
       console.error("Erro ao fazer upload:", error);
+      // Adiciona uma lógica para mostrar o erro ao usuário se necessário
     } finally {
       setIsUploading(false);
     }

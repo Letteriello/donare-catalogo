@@ -403,10 +403,12 @@ ImageUploadButton.propTypes = {
         setImageProgress(prev => (prev < 90 ? prev + 10 : prev));
       }, 300);
       
-      const { file_url } = await UploadFile({ file });
+      const response = await UploadFile({ file, path: 'products' });
       
       clearInterval(interval);
       setImageProgress(100);
+      
+      const file_url = response.file_url;
       
       if (type === "main") {
         setFormData(prev => ({ ...prev, main_image: file_url }));
