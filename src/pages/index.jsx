@@ -64,7 +64,7 @@ function PagesContent() {
                 <Route path="/catalog" element={<Catalogo />} />
                 
                 {/* Outras rotas */}
-                <Route path="/produto" element={<ProdutoDetalhe />} />
+                <Route path="/produtodetalhe" element={<ProdutoDetalhe />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/contato" element={<Contato />} />
                 
