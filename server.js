@@ -75,8 +75,8 @@ const upload = multer({
   }
 });
 
-// Rota para upload de arquivo
-app.post('/api/upload/:type?', upload.single('file'), (req, res) => {
+// Função para processar o upload
+const processUpload = (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
@@ -99,7 +99,13 @@ app.post('/api/upload/:type?', upload.single('file'), (req, res) => {
       error: error.message || 'Erro no upload do arquivo',
     });
   }
-});
+};
+
+// Rota para upload com tipo específico
+app.post('/api/upload/:type', upload.single('file'), processUpload);
+
+// Rota para upload sem tipo específico (usará 'products' como padrão)
+app.post('/api/upload', upload.single('file'), processUpload);
 
 // Tratamento de erros
 app.use((err, req, res, _next) => {
