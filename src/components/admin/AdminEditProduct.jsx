@@ -1,253 +1,239 @@
-import { useState, useEffect } from "react";
-import PropTypes from "prop-types"; // Added import
-import { Product } from "@/api/entities";
-import { Category } from "@/api/entities";
-import { X, Plus, Loader2, Upload, Trash2, Edit, Search, GripVertical, ChevronDown, ChevronUp, Camera, Save } from "lucide-react";
-import { UploadFile } from "@/api/integrations";
+import { useState, useEffect, useCallback } from 'react';
+import PropTypes from "prop-types";
+import { Dialog, DialogContent, DialogClose, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { v4 as uuidv4 } from 'uuid';
+import { useProductDraftStore } from '@/stores/useProductDraftStore';
+import { ProductForm } from '../productForm/ProductForm'; // Main component for product editing
+
+import { Product, Category } from "@/api/entities";
+import { X, Plus, Loader2, Search, GripVertical, ChevronDown, ChevronUp, Camera, Save, Edit, Trash2 } from "lucide-react";
+// import { UploadFile } from "@/api/integrations"; // Uploads handled by ProductForm
 import { motion, AnimatePresence } from "framer-motion";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { toast } from "@/hooks/use-toast";
 
 export default function AdminEditProduct({ onSave, onCancel }) {
-  const [products, setProducts] = useState([]);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    main_image: "",
-    gallery: [],
-    categoryId: "", // Era "category" anteriormente
-    subcategory: "",
-    options: [],
-    priceRetail: "", // Renamed from price
-    priceWholesale: "", // New field
-    dimensions: { // New field group
-      height: "",
-      width: "",
-      length: ""
-    },
-    whatsapp_link: "",
-    is_new: false,
-    is_limited: false,
-    is_featured: false
-  });
+  // Zustand store hooks
+  const draft = useProductDraftStore((state) => state.draft);
+  const setDraft = useProductDraftStore((state) => state.setDraft);
+  // resetDraft is not explicitly selected here anymore as the component primarily
+  // uses setDraft(initialDraftStateFromStore) for its reset logic.
+  // This change prevents the selector from returning a new object reference
+  // on each render, which was the likely cause of the infinite re-render loop.
+  const initialDraftStateFromStore = useProductDraftStore.getState().initialDraft;
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [isProductsLoading, setIsProductsLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [imageUploading, setImageUploading] = useState(false);
-  const [imageProgress, setImageProgress] = useState(0);
-  const [isCreating, setIsCreating] = useState(false);
+
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false); // For main save operation
+  const [isProductsLoading, setIsProductsLoading] = useState(true); // For product list loading
+  const [isCreating, setIsCreating] = useState(false); // Controls visibility of ProductForm vs. ProductList
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCategories, setExpandedCategories] = useState({});
-  
-  // Carregar categorias do banco de dados
   const [categories, setCategories] = useState([]);
-  
-  useEffect(() => {
-    loadProducts();
-    loadCategories();
+
+  // States for BaseProductNameModal (if kept separate from ProductForm)
+  const [isBaseProductNameModalOpen, setIsBaseProductNameModalOpen] = useState(false);
+  const [allBaseProductNames, setAllBaseProductNames] = useState([]);
+  const [newBaseProductName, setNewBaseProductName] = useState("");
+
+
+  const loadUniqueBaseProductNames = useCallback((productsList) => {
+    if (productsList && productsList.length > 0) {
+      const uniqueNames = new Set();
+      productsList.forEach(product => {
+        if (product.baseProductName && product.baseProductName.trim() !== "") {
+          uniqueNames.add(product.baseProductName.trim());
+        }
+      });
+      setAllBaseProductNames(Array.from(uniqueNames).sort());
+    } else {
+      setAllBaseProductNames([]);
+    }
   }, []);
 
-  const loadCategories = async () => {
+  const loadProducts = useCallback(async () => {
+    setIsProductsLoading(true);
+    try {
+      const fetchedProducts = await Product.list();
+      setProducts(fetchedProducts);
+      loadUniqueBaseProductNames(fetchedProducts);
+    } catch (err) {
+      console.error("Erro ao carregar produtos:", err);
+      toast({ title: "Erro", description: "Falha ao carregar produtos.", variant: "destructive" });
+    } finally {
+      setIsProductsLoading(false);
+    }
+  }, [loadUniqueBaseProductNames]);
+
+  const loadCategories = useCallback(async () => {
     try {
       const categoriesData = await Category.list();
       setCategories(categoriesData);
-      
-      // Inicializar todas as categorias como expandidas
       const initialExpandedState = {};
       categoriesData.forEach(cat => {
         initialExpandedState[cat.id] = true;
       });
       setExpandedCategories(initialExpandedState);
-    } catch (error) {
-      console.error("Erro ao carregar categorias:", error);
+    } catch (err) {
+      console.error("Erro ao carregar categorias:", err);
+      toast({ title: "Erro", description: "Falha ao carregar categorias.", variant: "destructive" });
     }
-  };
+  }, []);
 
-  const loadProducts = async () => {
-    setIsProductsLoading(true);
-    try {
-      const fetchedProducts = await Product.list();
-      setProducts(fetchedProducts);
-    } catch (error) {
-      console.error("Erro ao carregar produtos:", error);
-    } finally {
-      setIsProductsLoading(false);
-    }
-  };
+  useEffect(() => {
+    loadProducts();
+    loadCategories();
+  }, [loadProducts, loadCategories]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmitProductForm = async () => {
     setIsLoading(true);
-    setError("");
-
+    // setError(""); // No longer needed with toast notifications
     try {
-      // Cria uma cópia do formData para ajustar campos antes de enviar
-      const productData = { ...formData };
+      // The `draft` from Zustand store is the source of truth
+      const payload = {
+        ...draft,
+        keywords: Array.isArray(draft.keywords) ? draft.keywords.join(', ') : draft.keywords,
+        // Variants are already in the correct structure in the store via ProductForm
+      };
+
+      if (draft.id) {
+        await Product.update(draft.id, payload);
+      } else {
+        // Create new product and get its ID to update the draft in store?
+        // Or rely on ProductForm to generate a temporary ID if needed for UI consistency.
+        // For now, assume Product.create handles ID generation server-side.
+        await Product.create(payload);
+      }
+      await loadProducts(); // Refresh product list
       
-      // Convert retail price
-      if (productData.priceRetail === "" || productData.priceRetail === undefined) {
-        productData.priceRetail = null;
+      // Reset form:
+      // Option 1: If resetDraft is a specific action in the store
+      // resetDraft(); 
+      // Option 2: Reset to the store's defined initial state
+      if (initialDraftStateFromStore) {
+        setDraft(initialDraftStateFromStore);
       } else {
-        productData.priceRetail = Number(productData.priceRetail);
+        // Fallback if initialDraftStateFromStore is not available (should be configured in store)
+        console.warn("Initial draft state from store is undefined. Resetting to a basic empty draft.");
+        setDraft({
+          id: null, baseName: '', categoryId: '', material: '', dimensions: '', description: '',
+          variants: [], status: 'draft', seoTitle: '', seoDescription: '', keywords: []
+        });
       }
 
-      // Convert wholesale price
-      if (productData.priceWholesale === "" || productData.priceWholesale === undefined) {
-        productData.priceWholesale = null;
-      } else {
-        productData.priceWholesale = Number(productData.priceWholesale);
-      }
-
-      // Convert dimensions, ensuring the dimensions object exists
-      productData.dimensions = productData.dimensions || {};
-      const { height, width, length } = productData.dimensions;
-
-      productData.dimensions.height = (height === "" || height === undefined) ? null : Number(height);
-      productData.dimensions.width = (width === "" || width === undefined) ? null : Number(width);
-      productData.dimensions.length = (length === "" || length === undefined) ? null : Number(length);
-
-      if (selectedProduct) {
-        await Product.update(selectedProduct.id, productData);
-      } else {
-        await Product.create(productData);
-      }
-      await loadProducts();
-      resetForm();
-      setIsCreating(false);
-      if (onSave) onSave();
-    } catch (error) {
-      console.error("Erro ao salvar produto:", error);
-      setError("Erro ao salvar produto. Por favor, tente novamente.");
+      setIsCreating(false); // Go back to product list view
+      if (onSave) onSave(); // Prop callback
+    } catch (err) {
+      console.error("Erro ao salvar produto:", err);
+      toast({ title: "Erro ao salvar produto", description: err.message || "Por favor, tente novamente.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleEditProduct = (product) => {
-    setSelectedProduct(product);
-    setFormData({
-      name: product.name || "",
-      description: product.description || "",
-      main_image: product.main_image || "",
-      gallery: product.gallery || [],
-      categoryId: product.categoryId || product.category || "", // Aceita tanto categoryId quanto category (para compatibilidade)
-      subcategory: product.subcategory || "",
-      options: product.options || [],
-      priceRetail: product.priceRetail || product.price || "", // Fallback to old 'price' field if priceRetail is missing
-      priceWholesale: product.priceWholesale || "",
-      dimensions: {
-        height: product.dimensions?.height || "",
-        width: product.dimensions?.width || "",
-        length: product.dimensions?.length || ""
-      },
-      whatsapp_link: product.whatsapp_link || "",
-      is_new: product.is_new || false,
-      is_limited: product.is_limited || false,
-      is_featured: product.is_featured || false
-    });
+
+  const handleEditProduct = (productToEdit) => {
+    const mainImage = productToEdit.main_image || null;
+    const galleryImages = productToEdit.gallery || [];
+    const uniqueGalleryImages = galleryImages.map(String).filter(img => img !== mainImage);
+    const allVariantImages = mainImage ? [String(mainImage), ...uniqueGalleryImages] : uniqueGalleryImages;
+
+    // Transform to the ProductDraft structure expected by the store and ProductForm
+    const transformedDraft = {
+      id: productToEdit.id || null, // Keep null if it's a new product based on an old one
+      baseName: productToEdit.baseProductName || productToEdit.name || "",
+      categoryId: productToEdit.categoryId || productToEdit.category || "",
+      categoryName: productToEdit.categoryName || "", // if available from productToEdit
+      material: productToEdit.materials || "",
+      dimensions: productToEdit.dimensions || "",
+      description: productToEdit.description || "",
+      variants: productToEdit.variants && productToEdit.variants.length > 0 ? productToEdit.variants.map(v => ({
+        id: v.id || uuidv4(),
+        color: v.color || "Cor Única",
+        hex: v.hexColor || "",
+        images: v.images || [], // Ensure images is an array
+        retail: parseFloat(v.priceRetail || v.retailPrice || 0),
+        wholesale: parseFloat(v.priceWholesale || v.wholesalePrice || 0),
+        sku: v.sku || "",
+        seoTitle: v.seoTitle || "",
+        seoDescription: v.seoDescription || "",
+        keywords: Array.isArray(v.keywords) ? v.keywords : (v.keywords ? String(v.keywords).split(',').map(k => k.trim()).filter(k => k) : []),
+      })) : [{ // Default variant if none exists in productToEdit
+        id: uuidv4(),
+        color: productToEdit.color || "Cor Única",
+        hex: productToEdit.hexColor || "",
+        images: allVariantImages,
+        retail: parseFloat(productToEdit.priceRetail || productToEdit.price || 0),
+        wholesale: parseFloat(productToEdit.priceWholesale || 0),
+        sku: productToEdit.sku || "",
+        seoTitle: "",
+        seoDescription: "",
+        keywords: [],
+      }],
+      status: productToEdit.status || 'draft',
+      seoTitle: productToEdit.metaTitle || productToEdit.seoTitle || "",
+      seoDescription: productToEdit.metaDescription || productToEdit.seoDescription || "",
+      keywords: Array.isArray(productToEdit.keywords)
+                ? productToEdit.keywords
+                : (productToEdit.keywords ? String(productToEdit.keywords).split(',').map(k => k.trim()).filter(k => k) : []),
+      // old fields that might not be in ProductDraft:
+      // whatsapp_link: productToEdit.whatsapp_link || "",
+      // careInstructions: productToEdit.careInstructions || "",
+      // story: productToEdit.story || "",
+      // is_new: productToEdit.is_new || false,
+      // is_limited: productToEdit.is_limited || false,
+      // is_featured: productToEdit.is_featured || false,
+    };
+    setDraft(transformedDraft);
     setIsCreating(true);
   };
-
-  // Modificar o componente de upload de imagem para suportar câmera
-  const ImageUploadButton = ({ id, onUpload, disabled }) => (
-    <div className="flex flex-col sm:flex-row gap-2">
-      <input
-        type="file"
-        id={`${id}_file`}
-        accept="image/*"
-        onChange={onUpload}
-        className="hidden"
-        disabled={disabled}
-      />
-      <input
-        type="file"
-        id={`${id}_camera`}
-        accept="image/*"
-        capture="environment"
-        onChange={onUpload}
-        className="hidden"
-        disabled={disabled}
-      />
-      <label
-        htmlFor={`${id}_file`}
-        className="flex-1 flex flex-col items-center justify-center p-4 border-2 border-dashed border-[#0B1F3A]/20 rounded-xl cursor-pointer hover:bg-[#F4F1EC] transition-colors"
-      >
-        <Upload className="w-6 h-6 text-[#0B1F3A]/40 mb-2" />
-        <span className="text-sm text-[#0B1F3A]/70">Escolher arquivo</span>
-      </label>
-      <label
-        htmlFor={`${id}_camera`}
-        className="flex-1 flex flex-col items-center justify-center p-4 border-2 border-dashed border-[#0B1F3A]/20 rounded-xl cursor-pointer hover:bg-[#F4F1EC] transition-colors"
-      >
-        <Camera className="w-6 h-6 text-[#0B1F3A]/40 mb-2" />
-        <span className="text-sm text-[#0B1F3A]/70">Usar câmera</span>
-      </label>
-    </div>
-  );
-
-ImageUploadButton.propTypes = {
-  id: PropTypes.string.isRequired,
-  onUpload: PropTypes.func.isRequired,
-  disabled: PropTypes.bool
-};
 
   const handleDeleteProduct = async (productId) => {
     if (window.confirm("Tem certeza que deseja excluir este produto?")) {
       try {
         await Product.delete(productId);
-        await loadProducts();
-      } catch (error) {
-        console.error("Erro ao excluir produto:", error);
+        await loadProducts(); // Refresh list
+      } catch (err) {
+        console.error("Erro ao excluir produto:", err);
+        toast({ title: "Erro", description: "Falha ao excluir produto.", variant: "destructive" });
       }
     }
   };
 
-  const resetForm = () => {
-    setSelectedProduct(null);
-    setFormData({
-      name: "",
-      description: "",
-      main_image: "",
-      gallery: [],
-      categoryId: "", // Renomeado de 'category' para 'categoryId' para corresponder ao backend
-      subcategory: "",
-      options: [],
-      priceRetail: "",
-      priceWholesale: "",
-      dimensions: {
-        height: "",
-        width: "",
-        length: ""
-      },
-      whatsapp_link: "",
-      is_new: false,
-      is_limited: false,
-      is_featured: false
-    });
+  const handleCreateNewProduct = () => {
+    // Reset draft in store to its initial state before showing the form
+    if (initialDraftStateFromStore) {
+      setDraft(initialDraftStateFromStore);
+    } else {
+      // Fallback if initialDraftStateFromStore is not available
+      setDraft({
+        id: null, baseName: '', categoryId: '', material: '', dimensions: '', description: '',
+        variants: [], status: 'draft', seoTitle: '', seoDescription: '', keywords: []
+      });
+    }
+    setIsCreating(true);
+  };
+  
+  const formatCategoryName = (categoryId) => {
+    if (!categoryId || !categories) return 'N/A';
+    const foundCategory = categories.find(cat => cat.id === categoryId);
+    return foundCategory ? foundCategory.name : 'Categoria Desconhecida';
   };
 
-  // Função para formatar categorias
-  // Função para formatar categorias - aceita tanto category quanto categoryId por compatibilidade
-  const formatCategory = (categoryIdOrCategory) => {
-    if (!categoryIdOrCategory || !categories) return 'Categoria não encontrada';
-    const foundCategory = categories.find(cat => cat.id === categoryIdOrCategory);
-    return foundCategory ? foundCategory.name : 'Categoria não encontrada';
-  };
-
-  // Função para filtrar produtos
   const filteredProducts = products.filter(product => {
+    const searchTermLower = searchTerm.toLowerCase();
     return (
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ((product.categoryId || product.category) && formatCategory(product.categoryId || product.category).toLowerCase().includes(searchTerm.toLowerCase()))
+      (product.name && product.name.toLowerCase().includes(searchTermLower)) ||
+      (product.description && product.description.toLowerCase().includes(searchTermLower)) ||
+      ((product.categoryId || product.category) && formatCategoryName(product.categoryId || product.category).toLowerCase().includes(searchTermLower))
     );
   });
 
-  // Agrupar produtos por categoria
   const groupedProducts = {};
   filteredProducts.forEach(product => {
-    // Usa categoryId se disponível, senão cai para o campo category legado
     const categoryId = product.categoryId || product.category || "sem_categoria";
     if (!groupedProducts[categoryId]) {
       groupedProducts[categoryId] = [];
@@ -255,7 +241,6 @@ ImageUploadButton.propTypes = {
     groupedProducts[categoryId].push(product);
   });
 
-  // Função para alternar a expansão da categoria
   const toggleCategoryExpansion = (categoryId) => {
     setExpandedCategories(prev => ({
       ...prev,
@@ -263,182 +248,90 @@ ImageUploadButton.propTypes = {
     }));
   };
 
-  const handleGalleryDragEnd = (result) => {
-    if (!result.destination) return;
-
-    // Se estiver arrastando da galeria para a posição principal
-    if (result.destination.droppableId === 'main-image' && result.source.droppableId === 'gallery') {
-      const draggedImage = formData.gallery[result.source.index];
-      const newGallery = [...formData.gallery];
-      
-      // Remove a imagem da galeria
-      newGallery.splice(result.source.index, 1);
-      
-      // Se já existia uma imagem principal, adiciona ela à galeria
-      if (formData.main_image) {
-        newGallery.unshift(formData.main_image);
-      }
-      
-      setFormData(prev => ({
-        ...prev,
-        main_image: draggedImage,
-        gallery: newGallery
-      }));
-      return;
-    }
-
-    // Se estiver arrastando a imagem principal para a galeria
-    if (result.source.droppableId === 'main-image' && result.destination.droppableId === 'gallery') {
-      const newGallery = [...formData.gallery];
-      const targetIndex = result.destination.index;
-      
-      // Adiciona a imagem principal na posição desejada da galeria
-      newGallery.splice(targetIndex, 0, formData.main_image);
-      
-      setFormData(prev => ({
-        ...prev,
-        main_image: '',
-        gallery: newGallery
-      }));
-      return;
-    }
-
-    // Reordenação normal da galeria
-    if (result.source.droppableId === 'gallery' && result.destination.droppableId === 'gallery') {
-      const items = Array.from(formData.gallery);
-      const [reorderedItem] = items.splice(result.source.index, 1);
-      items.splice(result.destination.index, 0, reorderedItem);
-
-      setFormData(prev => ({ ...prev, gallery: items }));
-    }
-  };
-
+  // Drag and drop for product reordering in the list
   const [hasOrderChanges, setHasOrderChanges] = useState(false);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
 
   const handleProductDragEnd = (result) => {
     if (!result.destination) return;
     
-    const [sourceCategoryId] = result.source.droppableId.split('-');
-    const [destCategoryId] = result.destination.droppableId.split('-');
+    const sourceCategoryId = result.source.droppableId;
+    const destCategoryId = result.destination.droppableId;
     
-    
-    if (sourceCategoryId === destCategoryId) {
-      // Mover dentro da mesma categoria
-      const categoryProducts = groupedProducts[sourceCategoryId];
-      const [movedProduct] = categoryProducts.splice(result.source.index, 1);
-      categoryProducts.splice(result.destination.index, 0, movedProduct);
-      
-      // Atualizar o array de produtos
-      const updatedProducts = products.filter(p => (p.categoryId || p.category) !== sourceCategoryId);
-      setProducts([...updatedProducts, ...categoryProducts]);
-      setHasOrderChanges(true);
-    } else {
-      // Mover entre categorias
-      const productToMove = groupedProducts[sourceCategoryId][result.source.index];
-      const updatedProduct = { ...productToMove, categoryId: destCategoryId };
-      
-      const updatedProducts = products.filter(p => p.id !== productToMove.id);
-      setProducts([...updatedProducts, updatedProduct]);
-      
-      // Atualizar no banco de dados imediatamente quando muda de categoria
-      Product.update(productToMove.id, {
-        categoryId: destCategoryId,
-        display_order: result.destination.index
-      })
-        .then(() => loadProducts())
-        .catch(error => console.error("Erro ao atualizar categoria do produto:", error));
+    let movedProduct;
+
+    // Find and remove product from source
+    const sourceCatProducts = groupedProducts[sourceCategoryId];
+    if (sourceCatProducts) {
+        movedProduct = sourceCatProducts.splice(result.source.index, 1)[0];
     }
+
+    if (!movedProduct) return;
+
+    // Update product's categoryId if moved to a different category
+    if (sourceCategoryId !== destCategoryId && destCategoryId !== "sem_categoria") {
+        movedProduct.categoryId = destCategoryId;
+    } else if (destCategoryId === "sem_categoria") {
+        movedProduct.categoryId = null; // Or handle as per your DB schema for "sem_categoria"
+    }
+    
+    // Add product to destination
+    const destCatProducts = groupedProducts[destCategoryId];
+    if (destCatProducts) {
+        destCatProducts.splice(result.destination.index, 0, movedProduct);
+    } else if (destCategoryId) { // New category for the product (should not happen if only reordering existing cats)
+        groupedProducts[destCategoryId] = [movedProduct];
+    }
+    
+    // Reconstruct the flat products array from groupedProducts to reflect new order and category changes
+    let updatedFlatProducts = [];
+    Object.keys(groupedProducts).forEach(catId => {
+        updatedFlatProducts = updatedFlatProducts.concat(groupedProducts[catId]);
+    });
+    
+    setProducts(updatedFlatProducts);
+    setHasOrderChanges(true);
   };
 
   const saveProductOrder = async () => {
     setIsSavingOrder(true);
     try {
-      // Atualizar a ordem de exibição de todos os produtos em cada categoria
-      for (const categoryId in groupedProducts) {
-        const categoryProducts = groupedProducts[categoryId];
-        const updatePromises = categoryProducts.map((product, index) =>
-          Product.update(product.id, { display_order: index })
-        );
-      
-        await Promise.all(updatePromises);
-      }
+      const updatePromises = products.map((product, index) => {
+        // Assuming each product in the flat `products` array now has its correct categoryId
+        // and its position in this array is its new global order (if you use global order).
+        // Or, if order is per-category, this logic needs to be more complex,
+        // iterating through groupedProducts.
+        // For simplicity, let's assume display_order is global or you adapt Product.update.
+        return Product.update(product.id, { 
+            display_order: index, 
+            categoryId: product.categoryId // Ensure categoryId is also updated if changed
+        });
+      });
+      await Promise.all(updatePromises);
       setHasOrderChanges(false);
-      await loadProducts();
-    } catch (error) {
-      console.error("Erro ao salvar ordem dos produtos:", error);
+      await loadProducts(); // Refresh to confirm
+    } catch (err) {
+      console.error("Erro ao salvar ordem dos produtos:", err);
+      toast({ title: "Erro", description: "Falha ao salvar a ordem dos produtos.", variant: "destructive" });
     } finally {
       setIsSavingOrder(false);
     }
   };
 
-  // Modificar o componente de upload de imagem para suportar câmera
-  const handleImageUpload = async (e, type) => {
-    const file = e.target.files[0];
-    if (!file) return;
 
-    // Verificar se é formato HEIC e avisar usuário
-    if (file.name.toLowerCase().endsWith('.heic')) {
-      setError("Formato HEIC não suportado. Por favor, converta para JPG, PNG ou WEBP antes de enviar.");
-      return;
-    }
-
-    // Verificar o tamanho do arquivo (máximo 5MB)
-    const maxSizeInBytes = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSizeInBytes) {
-      setError("A imagem excede o tamanho máximo de 5MB. Por favor, escolha uma imagem menor.");
-      return;
-    }
-
-    // Verificar se o formato é suportado (jpg, png, webp)
-    const allowedFormats = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedFormats.includes(file.type)) {
-      setError("Formato de imagem não suportado. Por favor, use JPG, PNG ou WEBP.");
-      return;
-    }
-
-    try {
-      setImageUploading(true);
-      setImageProgress(0);
-      
-      const interval = setInterval(() => {
-        setImageProgress(prev => (prev < 90 ? prev + 10 : prev));
-      }, 300);
-      
-      const response = await UploadFile({ file, path: 'products' });
-      
-      clearInterval(interval);
-      setImageProgress(100);
-      
-      const file_url = response.file_url;
-      
-      if (type === "main") {
-        setFormData(prev => ({ ...prev, main_image: file_url }));
-      } else {
-        setFormData(prev => ({ ...prev, gallery: [...prev.gallery, file_url] }));
-      }
-    } catch (error) {
-      console.error("Upload error:", error);
-      setError("Erro ao fazer upload da imagem. Tente novamente.");
-    } finally {
-      setTimeout(() => {
-        setImageUploading(false);
-        setImageProgress(0);
-      }, 500);
-    }
-  };
-
+  // UI Rendering
   if (isCreating) {
     return (
       <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl sm:text-2xl font-belleza text-[#0B1F3A]">
-            {selectedProduct ? "Editar Produto" : "Novo Produto"}
+            {draft.id ? "Editar Produto" : "Novo Produto"}
           </h2>
           <button
             onClick={() => {
-              resetForm();
               setIsCreating(false);
+              // Optionally reset draft if user cancels editing an existing product without saving
+              // resetDraft(); // Or setDraft(initialDraftStateFromStore)
             }}
             className="text-[#0B1F3A]/60 hover:text-[#0B1F3A] p-2 rounded-full hover:bg-[#F4F1EC]"
           >
@@ -446,404 +339,113 @@ ImageUploadButton.propTypes = {
           </button>
         </div>
 
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-xl">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Campos do formulário */}
-            <div className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                  Nome do Produto *
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                  Descrição *
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  rows={5}
-                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                  Link do WhatsApp Business
-                </label>
-                <input
-                  type="url"
-                  name="whatsapp_link"
-                  value={formData.whatsapp_link}
-                  onChange={(e) => setFormData({...formData, whatsapp_link: e.target.value})}
-                  placeholder="https://wa.me/c/..."
-                  className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                />
-              </div>
-            </div>
-
-            {/* New section for Dimensions */}
-            <div>
-              <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                Dimensões (cm)
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label htmlFor="dimensionHeight" className="block text-xs font-medium text-[#0B1F3A]/80 mb-1">Altura</label>
-                  <input
-                    type="number"
-                    name="dimensionHeight"
-                    id="dimensionHeight"
-                    value={formData.dimensions.height}
-                    onChange={(e) => setFormData({...formData, dimensions: { ...formData.dimensions, height: e.target.value }})}
-                    step="0.1"
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                    placeholder="Ex: 10.5"
-                  />
-                </div>
-                </div>
-                <div>
-                  <label htmlFor="dimensionWidth" className="block text-xs font-medium text-[#0B1F3A]/80 mb-1">Largura</label>
-                  <input
-                    type="number"
-                    name="dimensionWidth"
-                    id="dimensionWidth"
-                    value={formData.dimensions.width}
-                    onChange={(e) => setFormData({...formData, dimensions: { ...formData.dimensions, width: e.target.value }})}
-                    step="0.1"
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                    placeholder="Ex: 15.0"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="dimensionLength" className="block text-xs font-medium text-[#0B1F3A]/80 mb-1">Comprimento</label>
-                  <input
-                    type="number"
-                    name="dimensionLength"
-                    id="dimensionLength"
-                    value={formData.dimensions.length}
-                    onChange={(e) => setFormData({...formData, dimensions: { ...formData.dimensions, length: e.target.value }})}
-                    step="0.1"
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                    placeholder="Ex: 20.2"
-                  />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                    Categoria *
-                  </label>
-                  <select
-                    name="categoryId"
-                    value={formData.categoryId}
-                    onChange={(e) => setFormData({...formData, categoryId: e.target.value})}
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                    required
-                  >
-                    <option value="">Selecione a Categoria</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                    Preço Varejo (R$)
-                  </label>
-                  <input
-                    type="number"
-                    name="priceRetail"
-                    value={formData.priceRetail}
-                    onChange={(e) => setFormData({...formData, priceRetail: e.target.value})}
-                    step="0.01"
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                    placeholder="Ex: 29.90"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                    Preço Atacado (R$)
-                  </label>
-                  <input
-                    type="number"
-                    name="priceWholesale"
-                    value={formData.priceWholesale}
-                    onChange={(e) => setFormData({...formData, priceWholesale: e.target.value})}
-                    step="0.01"
-                    className="w-full px-4 py-3 border border-[#0B1F3A]/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B1F3A]/50 text-base sm:text-lg"
-                    placeholder="Ex: 19.90"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    name="is_new"
-                    checked={formData.is_new}
-                    onChange={(e) => setFormData({...formData, is_new: e.target.checked})}
-                    className="w-5 h-5 rounded-lg"
-                  />
-                  <span className="text-[#0B1F3A]/80">Marcar como Novidade</span>
-                </label>
-
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    name="is_limited"
-                    checked={formData.is_limited}
-                    onChange={(e) => setFormData({...formData, is_limited: e.target.checked})}
-                    className="w-5 h-5 rounded-lg"
-                  />
-                  <span className="text-[#0B1F3A]/80">Marcar como Edição Limitada</span>
-                </label>
-
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    name="is_featured"
-                    checked={formData.is_featured}
-                    onChange={(e) => setFormData({...formData, is_featured: e.target.checked})}
-                    className="w-5 h-5 rounded-lg"
-                  />
-                  <span className="text-[#0B1F3A]/80">Destacar na Página Inicial</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Imagens */}
-            <DragDropContext onDragEnd={handleGalleryDragEnd}>
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                    Imagem Principal * (Arraste uma imagem da galeria para definir como principal)
-                  </label>
-                  <Droppable droppableId="main-image" direction="horizontal">
-                    {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="relative bg-white p-4 rounded-xl border-2 border-dashed border-[#0B1F3A]/20 min-h-[200px]"
-                      >
-                        <div className="flex flex-col sm:flex-row sm:items-center w-full">
-                        {formData.main_image ? (
-                          <Draggable
-                            draggableId="main-image-draggable" // Changed to avoid conflict with droppableId
-                            index={0}
-                          >
-                            {(providedDraggable, snapshot) => ( // Renamed to avoid conflict with outer 'provided'
-                              <div
-                                ref={providedDraggable.innerRef}
-                                {...providedDraggable.draggableProps}
-                                {...providedDraggable.dragHandleProps}
-                                className={`relative ${snapshot.isDragging ? 'z-50' : ''}`}
-                              >
-                                <img
-                                  src={formData.main_image}
-                                  alt="Imagem principal"
-                                  className="w-full h-48 object-contain"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setFormData({...formData, main_image: ""})}
-                                  className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-full hover:bg-red-600"
-                                >
-                                  <Trash2 size={20} />
-                                </button>
-                              </div>
-                            )}
-                          </Draggable>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center h-48">
-                            <Upload className="w-10 h-10 text-[#0B1F3A]/40 mb-2" />
-                            <p className="text-[#0B1F3A]/70">Arraste uma imagem da galeria ou faça upload</p>
-                          </div>
-                        )}
-                        </div>
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-
-                  {!formData.main_image && (
-                    <div className="relative">
-                      <ImageUploadButton
-                        id="main_image"
-                        onUpload={(e) => handleImageUpload(e, "main")}
-                        disabled={imageUploading}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[#0B1F3A] mb-2">
-                    Galeria de Imagens
-                    <span className="text-sm font-normal text-[#0B1F3A]/60 ml-2">
-                      (Arraste para reordenar)
-                    </span>
-                  </label>
-                  
-                  <Droppable droppableId="gallery" direction="horizontal">
-                    {(provided) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.droppableProps}
-                        className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4"
-                      >
-                        {formData.gallery.map((image, index) => (
-                          <Draggable
-                            key={`${image}-${index}`}
-                            draggableId={`${image}-${index}`}
-                            index={index}
-                          >
-                            {(provided, snapshot) => (
-                              <div
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                className={`relative rounded-xl overflow-hidden shadow-sm transition-transform ${
-                                  snapshot.isDragging ? 'scale-105 shadow-lg' : ''
-                                }`}
-                              >
-                                <div className="aspect-square">
-                                  <img
-                                    src={image}
-                                    alt={`Imagem ${index + 1}`}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
-                                
-                                <div className="absolute inset-x-0 top-0 p-2 bg-gradient-to-b from-black/50 to-transparent flex justify-between items-start">
-                                  <div
-                                    {...provided.dragHandleProps}
-                                    className="p-1.5 rounded-lg bg-white/20 backdrop-blur-sm cursor-grab active:cursor-grabbing"
-                                  >
-                                    <GripVertical size={16} className="text-white" />
-                                  </div>
-                                  
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newGallery = [...formData.gallery];
-                                      newGallery.splice(index, 1);
-                                      setFormData(prev => ({ ...prev, gallery: newGallery }));
-                                    }}
-                                    className="p-1.5 rounded-lg bg-red-500/80 backdrop-blur-sm hover:bg-red-500 transition-colors"
-                                  >
-                                    <X size={16} className="text-white" />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                        
-                        {(!formData.gallery || formData.gallery.length < 5) && (
-                          <div className="aspect-square">
-                            <input
-                              type="file"
-                              id="gallery_image"
-                              accept="image/*"
-                              onChange={(e) => handleImageUpload(e, "gallery")}
-                              className="hidden"
-                              disabled={imageUploading}
+        {/* Error messages are now handled by toast notifications */}
+        
+        {/* ------ ProductForm Integration ------ */}
+        <ProductForm /> 
+        {/* ProductForm uses Zustand store, so it will have the current draft */}
+        {/* It has its own Save Draft and Publish buttons. We need to decide how they integrate. */}
+        {/* For now, AdminEditProduct will have its own save button that calls handleSubmitProductForm */}
+        
+        <div className="flex flex-col sm:flex-row sm:justify-end gap-4 pt-6 mt-6 border-t border-[#0B1F3A]/10">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setIsCreating(false);
+              // resetDraft(); // Or setDraft(initialDraftStateFromStore)
+            }}
+            className="w-full sm:w-auto"
+          >
+            Cancelar
+          </Button>
+        </div>
+        {/* Modal para Gerenciar Nomes Base do Produto - If this logic is specific to AdminEditProduct and not ProductForm */}
+        <Dialog open={isBaseProductNameModalOpen} onOpenChange={setIsBaseProductNameModalOpen}>
+            <DialogContent className="sm:max-w-[525px] bg-white">
+                <DialogHeader>
+                    <DialogTitle className="text-xl font-belleza text-[#0B1F3A]">Gerenciar Nomes Base</DialogTitle>
+                    <DialogDescription>
+                        Selecione um nome base existente ou adicione um novo.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-[#0B1F3A]">Adicionar Novo Nome Base</label>
+                        <div className="flex gap-2">
+                            <Input
+                                value={newBaseProductName}
+                                onChange={(e) => setNewBaseProductName(e.target.value)}
+                                placeholder="Ex: Jogo Americano Rendado"
+                                className="border-[#0B1F3A]/20 focus:ring-[#0B1F3A]/50 flex-grow"
                             />
-                            <label
-                              htmlFor="gallery_image"
-                              className="flex items-center justify-center w-full h-full border-2 border-dashed border-[#0B1F3A]/20 rounded-xl cursor-pointer hover:bg-[#F4F1EC] transition-colors"
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="border-[#0B1F3A] text-[#0B1F3A] hover:bg-[#0B1F3A]/10"
+                                onClick={() => {
+                                    if (newBaseProductName.trim() && !allBaseProductNames.includes(newBaseProductName.trim())) {
+                                        const updatedNames = [...allBaseProductNames, newBaseProductName.trim()].sort();
+                                        setAllBaseProductNames(updatedNames);
+                                        // Here, instead of dispatching, we'd call the store action directly
+                                        // setBaseName(newBaseProductName.trim()); // Assuming useProductDraftStore has setBaseName
+                                        useProductDraftStore.getState().setBaseName(newBaseProductName.trim());
+                                        setNewBaseProductName("");
+                                        // setIsBaseProductNameModalOpen(false); // Optional
+                                    }
+                                }}
+                                disabled={!newBaseProductName.trim() || allBaseProductNames.includes(newBaseProductName.trim())}
                             >
-                              {imageUploading ? (
-                                <div className="text-center">
-                                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#0B1F3A] mx-auto mb-2"></div>
-                                  <p className="text-[#0B1F3A]/70 text-sm">
-                                    Enviando... {imageProgress}%
-                                  </p>
-                                </div>
-                              ) : (
-                                <div className="text-center">
-                                  <Plus size={24} className="mx-auto mb-2 text-[#0B1F3A]/40" />
-                                  <p className="text-[#0B1F3A]/60 text-sm">
-                                    Adicionar Imagem
-                                  </p>
-                                </div>
-                              )}
-                            </label>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </Droppable>
-                  
-                  <p className="text-sm text-[#0B1F3A]/60">
-                    Adicione até 5 imagens para mostrar diferentes ângulos do produto
-                  </p>
+                                <Plus size={18} className="mr-2" /> Adicionar
+                            </Button>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-[#0B1F3A]">Nomes Base Existentes</label>
+                        <ScrollArea className="h-[200px] w-full rounded-md border border-[#0B1F3A]/20 p-3">
+                            {allBaseProductNames.length > 0 ? (
+                                allBaseProductNames.map((name) => (
+                                    <div
+                                        key={name}
+                                        onClick={() => {
+                                            // setBaseName(name); // Assuming useProductDraftStore has setBaseName
+                                            useProductDraftStore.getState().setBaseName(name);
+                                            setIsBaseProductNameModalOpen(false);
+                                        }}
+                                        className={`p-2 hover:bg-[#F4F1EC] rounded-md cursor-pointer text-sm transition-colors ${
+                                            draft.baseName === name ? "bg-[#E0DACE] text-[#0B1F3A] font-semibold" : "text-[#0B1F3A]/80"
+                                        }`}
+                                    >
+                                        {name}
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-center text-[#0B1F3A]/50 py-4">Nenhum nome base.</p>
+                            )}
+                        </ScrollArea>
+                    </div>
                 </div>
-              </div>
-            </DragDropContext>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:justify-end gap-4 pt-6 border-t border-[#0B1F3A]/10">
-            <button
-              type="button"
-              onClick={() => {
-                resetForm();
-                setIsCreating(false);
-              }}
-              className="w-full sm:w-auto px-4 py-2 text-base sm:px-6 sm:py-3 sm:text-lg border-2 border-[#0B1F3A]/20 rounded-xl hover:bg-[#F4F1EC] transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full sm:w-auto px-4 py-2 text-base sm:px-6 sm:py-3 sm:text-lg bg-[#0B1F3A] text-white rounded-xl hover:bg-[#0B1F3A]/90 transition-colors disabled:opacity-70 flex items-center justify-center sm:justify-start"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="animate-spin w-5 h-5 mr-2" />
-                  Salvando...
-                </>
-              ) : (
-                selectedProduct ? 'Atualizar Produto' : 'Criar Produto'
-              )}
-            </button>
-          </div>
-        </form>
+                <DialogFooter>
+                    <DialogClose asChild>
+                        <Button type="button" variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-100">
+                            Fechar
+                        </Button>
+                    </DialogClose>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
       </div>
     );
   }
 
-  // Lista de produtos
+  // Product List View
   return (
     <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl sm:text-2xl font-belleza text-[#0B1F3A]">Produtos</h2>
         <button
-          onClick={() => setIsCreating(true)}
+          onClick={handleCreateNewProduct}
           className="flex items-center gap-2 px-3 py-2 sm:px-4 text-sm sm:text-base bg-[#0B1F3A] text-white rounded-xl hover:bg-[#0B1F3A]/90 transition-all"
         >
           <Plus size={20} />
@@ -851,9 +453,8 @@ ImageUploadButton.propTypes = {
         </button>
       </div>
 
-      {/* Busca de produtos */}
       <div className="relative mb-6">
-        <input
+        <Input
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -863,10 +464,9 @@ ImageUploadButton.propTypes = {
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[#0B1F3A]/40" />
       </div>
 
-      {/* Botão Salvar Ordem */}
       {hasOrderChanges && (
         <div className="mb-6 flex justify-end">
-          <button
+          <Button
             onClick={saveProductOrder}
             disabled={isSavingOrder}
             className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl hover:bg-green-600 transition-colors"
@@ -882,7 +482,7 @@ ImageUploadButton.propTypes = {
                 Salvar Ordem dos Produtos
               </>
             )}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -894,7 +494,7 @@ ImageUploadButton.propTypes = {
         <DragDropContext onDragEnd={handleProductDragEnd}>
           <div className="space-y-6">
             {Object.entries(groupedProducts).map(([categoryId, categoryProducts]) => {
-              const categoryName = categoryId === "sem_categoria" ? "Sem Categoria" : formatCategory(categoryId);
+              const categoryName = categoryId === "sem_categoria" ? "Sem Categoria" : formatCategoryName(categoryId);
               const isExpanded = expandedCategories[categoryId];
 
               return (
@@ -903,7 +503,7 @@ ImageUploadButton.propTypes = {
                     className="flex justify-between items-center cursor-pointer"
                     onClick={() => toggleCategoryExpansion(categoryId)}
                   >
-                    <h3 className="text-lg font-belleza text-[#0B1F3A]">{categoryName} {categoryId !== "sem_categoria" && categoryName !== 'Categoria não encontrada' ? `(${categoryProducts.length})` : ''}</h3>
+                    <h3 className="text-lg font-belleza text-[#0B1F3A]">{categoryName} {categoryId !== "sem_categoria" && categoryName !== 'Categoria Desconhecida' ? `(${categoryProducts.length})` : ''}</h3>
                     {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                   </div>
                   
@@ -925,16 +525,16 @@ ImageUploadButton.propTypes = {
                             >
                               {categoryProducts.map((product, index) => (
                                 <Draggable key={product.id} draggableId={product.id} index={index}>
-                                  {(provided, snapshot) => (
+                                  {(providedDraggable, snapshot) => ( // Renamed provided for clarity
                                     <div
-                                      ref={provided.innerRef}
-                                      {...provided.draggableProps}
+                                      ref={providedDraggable.innerRef}
+                                      {...providedDraggable.draggableProps}
                                       className={`flex items-start gap-3 p-3 bg-white rounded-lg shadow-md transition-shadow ${
                                         snapshot.isDragging ? 'shadow-xl' : ''
                                       }`}
                                     >
                                       <div
-                                        {...provided.dragHandleProps}
+                                        {...providedDraggable.dragHandleProps} // Use renamed providedDraggable
                                         className="p-1.5 text-[#0B1F3A]/50 hover:text-[#0B1F3A] cursor-grab active:cursor-grabbing"
                                       >
                                         <GripVertical size={20} />
@@ -958,7 +558,7 @@ ImageUploadButton.propTypes = {
                                         <h4 className="text-base font-semibold text-[#0B1F3A] truncate">{product.name}</h4>
                                         <p className="text-sm text-[#0B1F3A]/70 truncate">{product.description}</p>
                                         <p className="text-xs text-[#0B1F3A]/50">
-                                          Preço: {product.price ? `R$ ${Number(product.price).toFixed(2)}` : 'Sob consulta'}
+                                          Preço: {product.priceRetail ? `R$ ${Number(product.priceRetail).toFixed(2)}` : (product.price ? `R$ ${Number(product.price).toFixed(2)}` : 'Sob consulta')}
                                         </p>
                                       </div>
                                       
@@ -989,6 +589,7 @@ ImageUploadButton.propTypes = {
                       </motion.div>
                     )}
                   </AnimatePresence>
+
                 </div>
               );
             })}
@@ -1000,8 +601,8 @@ ImageUploadButton.propTypes = {
                   {searchTerm ? "Tente refinar sua busca ou " : ""}
                   <button
                     onClick={() => {
-                      setSearchTerm(""); // Limpar busca
-                      setIsCreating(true); // Abrir formulário de novo produto
+                      setSearchTerm(""); 
+                      handleCreateNewProduct(); // Use the refactored handler
                     }}
                     className="text-[#0B1F3A] hover:underline font-semibold"
                   >
@@ -1027,6 +628,7 @@ ImageUploadButton.propTypes = {
       )}
     </div>
   );
+
 }
 AdminEditProduct.propTypes = {
   onSave: PropTypes.func,
