@@ -100,14 +100,14 @@ button:focus-visible {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
-    --sidebar-background: 36 20% 92%; /* Light beige for sidebar */
-    --sidebar-foreground: 212 70% 14%; /* Deep blue text on sidebar */
-    --sidebar-primary: 212 70% 14%; /* Deep blue for primary sidebar elements */
-    --sidebar-primary-foreground: 0 0% 100%; /* White text on primary sidebar elements */
-    --sidebar-accent: 36 25% 85%; /* Slightly darker beige for sidebar accents */
-    --sidebar-accent-foreground: 212 70% 14%; /* Deep blue text on sidebar accents */
-    --sidebar-border: 36 15% 80%; /* Beige borders for sidebar */
-    --sidebar-ring: 212 70% 25%; /* Deep blue for sidebar focus rings */
+    --sidebar-background: 0 0% 98%; /* Light beige for sidebar */
+    --sidebar-foreground: 240 5.3% 26.1%; /* Deep blue text on sidebar */
+    --sidebar-primary: 240 5.9% 10%; /* Deep blue for primary sidebar elements */
+    --sidebar-primary-foreground: 0 0% 98%; /* White text on primary sidebar elements */
+    --sidebar-accent: 240 4.8% 95.9%; /* Slightly darker beige for sidebar accents */
+    --sidebar-accent-foreground: 240 5.9% 10%; /* Deep blue text on sidebar accents */
+    --sidebar-border: 220 13% 91%; /* Beige borders for sidebar */
+    --sidebar-ring: 217.2 91.2% 59.8%; /* Deep blue for sidebar focus rings */
   }
   
   .dark {
@@ -135,20 +135,31 @@ button:focus-visible {
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 212 70% 14%; /* Deep blue sidebar */
-    --sidebar-foreground: 36 25% 95%; /* Light beige text */
-    --sidebar-primary: 36 25% 90%; /* Light beige for primary sidebar elements */
-    --sidebar-primary-foreground: 212 70% 14%; /* Deep blue text on primary sidebar elements */
-    --sidebar-accent: 212 60% 20%; /* Darker blue for sidebar accents */
-    --sidebar-accent-foreground: 36 25% 95%; /* Light beige text on sidebar accents */
-    --sidebar-border: 212 60% 20%; /* Dark blue borders for sidebar */
-    --sidebar-ring: 36 25% 80%; /* Light beige for sidebar focus rings */
+    --sidebar-background: 240 5.9% 10%; /* Deep blue sidebar */
+    --sidebar-foreground: 240 4.8% 95.9%; /* Light beige text */
+    --sidebar-primary: 224.3 76.3% 48%; /* Light beige for primary sidebar elements */
+    --sidebar-primary-foreground: 0 0% 100%; /* Deep blue text on primary sidebar elements */
+    --sidebar-accent: 240 3.7% 15.9%; /* Darker blue for sidebar accents */
+    --sidebar-accent-foreground: 240 4.8% 95.9%; /* Light beige text on sidebar accents */
+    --sidebar-border: 240 3.7% 15.9%; /* Dark blue borders for sidebar */
+    --sidebar-ring: 217.2 91.2% 59.8%; /* Light beige for sidebar focus rings */
   }
   
   * {
     @apply border-border outline-ring/50;
   }
   
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
   body {
     @apply bg-background text-foreground;
   }

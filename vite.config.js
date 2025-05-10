@@ -18,9 +18,15 @@ export default defineConfig({
         target: 'https://erp.tiny.com.br/webhook/api/v1/parceiro/8471',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/tiny/, '')
+        },
+        // Proxy other API requests to the Express server on port 3001
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          // No rewrite needed if paths on the backend match /api/...
+        }
       }
-    }
-  },
+    },
   resolve: {
     alias: {
       '@': path.resolve(path.dirname(fileURLToPath(import.meta.url)), './src'),

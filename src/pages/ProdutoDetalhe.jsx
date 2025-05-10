@@ -7,7 +7,9 @@ import { ChevronLeft, ChevronRight, X, Maximize2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function ProdutoDetalhe() {
-  const [product, setProduct] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null); // Produto/variante atualmente selecionado para exibição
+  const [productVariants, setProductVariants] = useState([]); // Todas as variantes de um produto base
+  const [activeProductName, setActiveProductName] = useState(""); // Nome do produto base (grupo) ou nome do produto individual
   const [isLoading, setIsLoading] = useState(true);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -18,29 +20,101 @@ export default function ProdutoDetalhe() {
   useEffect(() => {
     const fetchProductData = async () => {
       setIsLoading(true);
+      setSelectedProduct(null);
+      setProductVariants([]);
+      setActiveProductName("");
+      setCurrentImageIndex(0); // Resetar índice da imagem ao mudar de produto/variante
+
       try {
         const urlParams = new URLSearchParams(location.search);
-        const productId = urlParams.get("id");
-        
-        if (!productId) {
+        const productIdFromUrl = urlParams.get("id");
+        const groupNameFromUrl = urlParams.get("group"); // baseProductName
+
+        if (!productIdFromUrl && !groupNameFromUrl) {
+          console.warn("Nem ID do produto nem nome do grupo fornecido na URL.");
           navigate(createPageUrl("Catalogo"));
           return;
         }
-        
-        // Buscar produto específico
-        const productData = await Product.get(productId);
-        setProduct(productData);
-        
-        // Buscar produtos relacionados (mesma categoria)
-        if (productData && productData.category) {
+
+        if (groupNameFromUrl) {
+          // Carregar grupo de variantes
+          setActiveProductName(groupNameFromUrl);
           const allProducts = await Product.list();
-          const related = allProducts
-            .filter(p => p.category === productData.category && p.id !== productData.id)
+          const variants = allProducts.filter(p => p.baseProductName === groupNameFromUrl);
+
+          if (variants.length > 0) {
+            setProductVariants(variants);
+            let initialVariant = variants.find(v => v.id === productIdFromUrl);
+            if (!initialVariant) {
+              initialVariant = variants[0]; // Pega a primeira variante se o ID não corresponder ou não for fornecido
+            }
+            setSelectedProduct(initialVariant);
+          } else {
+            console.error(`Nenhuma variante encontrada para o grupo: ${groupNameFromUrl}`);
+            // Opcionalmente, redirecionar ou mostrar mensagem de erro
+            // Por enquanto, tentará carregar pelo ID se houver um
+            if (productIdFromUrl) {
+              const productData = await Product.get(productIdFromUrl);
+              if (productData) {
+                setSelectedProduct(productData);
+                setActiveProductName(productData.name); // Define o nome ativo como o nome do produto individual
+              } else {
+                 navigate(createPageUrl("Catalogo")); // Produto não encontrado
+                 return;
+              }
+            } else {
+              navigate(createPageUrl("Catalogo")); // Grupo não encontrado e sem ID
+              return;
+            }
+          }
+        } else if (productIdFromUrl) {
+          // Carregar produto individual
+          const productData = await Product.get(productIdFromUrl);
+          if (productData) {
+            setSelectedProduct(productData); // Define o produto selecionado
+            
+            if (productData.baseProductName) {
+              // Se o produto faz parte de um grupo, carregar todas as variantes desse grupo
+              setActiveProductName(productData.baseProductName);
+              const allProducts = await Product.list();
+              const variants = allProducts.filter(p => p.baseProductName === productData.baseProductName);
+              if (variants.length > 0) {
+                setProductVariants(variants);
+              } else {
+                // Caso raro: tem baseProductName mas não encontra outras variantes. Trata como individual.
+                setProductVariants([productData]); // Define a si mesmo como a única variante
+              }
+            } else {
+              // Produto verdadeiramente individual, sem grupo
+              setActiveProductName(productData.name);
+              setProductVariants([productData]); // Define a si mesmo como a única "variante" para consistência lógica
+            }
+          } else {
+            console.error(`Produto não encontrado com ID: ${productIdFromUrl}`);
+            navigate(createPageUrl("Catalogo"));
+            return;
+          }
+        }
+
+        // Buscar produtos relacionados (mesma categoria)
+        // Ajustar para considerar o produto selecionado (selectedProduct) e suas variantes (productVariants)
+        if (selectedProduct && selectedProduct.category) {
+          const allDbProducts = await Product.list(); // Buscar todos para filtro
+          const related = allDbProducts
+            .filter(p => {
+              const isSameCategory = p.category === selectedProduct.category;
+              const isNotSelfOrVariant = groupNameFromUrl
+                ? p.baseProductName !== groupNameFromUrl // Se é um grupo, não mostrar outras variantes do mesmo grupo
+                : p.id !== selectedProduct.id;         // Se é individual, não mostrar ele mesmo
+              return isSameCategory && isNotSelfOrVariant;
+            })
             .slice(0, 3);
           setRelatedProducts(related);
         }
+
       } catch (error) {
-        console.error("Erro ao carregar produto:", error);
+        console.error("Erro ao carregar dados do produto:", error);
+        // setErrorState(error) // Seria bom ter um estado de erro para UI
       } finally {
         setIsLoading(false);
       }
@@ -50,16 +124,16 @@ export default function ProdutoDetalhe() {
   }, [location.search, navigate]);
 
   const nextImage = () => {
-    if (!product || !product.gallery) return;
-    setCurrentImageIndex((prevIndex) => 
-      prevIndex === product.gallery.length ? 0 : prevIndex + 1
+    if (!selectedProduct || !selectedProduct.gallery) return;
+    setCurrentImageIndex((prevIndex) =>
+      prevIndex === selectedProduct.gallery.length ? 0 : prevIndex + 1
     );
   };
 
   const prevImage = () => {
-    if (!product || !product.gallery) return;
-    setCurrentImageIndex((prevIndex) => 
-      prevIndex === 0 ? product.gallery.length : prevIndex - 1
+    if (!selectedProduct || !selectedProduct.gallery) return;
+    setCurrentImageIndex((prevIndex) =>
+      prevIndex === 0 ? selectedProduct.gallery.length : prevIndex - 1
     );
   };
 
@@ -69,8 +143,8 @@ export default function ProdutoDetalhe() {
 
   // Obter todas as imagens (principal + galeria)
   const getAllImages = () => {
-    if (!product) return [];
-    return [product.main_image, ...(product.gallery || [])];
+    if (!selectedProduct) return [];
+    return [selectedProduct.main_image, ...(selectedProduct.gallery || [])];
   };
 
   const fadeIn = {
@@ -97,7 +171,7 @@ export default function ProdutoDetalhe() {
     );
   }
 
-  if (!product) {
+  if (!selectedProduct) {
     return (
       <div className="container mx-auto px-4 py-12 text-center">
         <h2 className="text-2xl font-belleza text-[#0B1F3A] mb-4">Produto não encontrado</h2>
@@ -168,6 +242,48 @@ export default function ProdutoDetalhe() {
           </Link>
         </div>
 
+        {/* Seleção de Variantes com Miniaturas */}
+        {productVariants && productVariants.length > 1 && (
+          <div className="pt-4 mt-4 border-t border-[#0B1F3A]/10"> {/* Aumentei a opacidade da borda */}
+            <h3 className="text-base font-medium text-[#0B1F3A] mb-4"> {/* Aumentei o tamanho da fonte e margem */}
+              Escolha a cor: {/* Ou "Modelos disponíveis:", "Estampas:" etc. */}
+            </h3>
+            <div className="flex space-x-3 overflow-x-auto py-2 px-1 scrollbar-thin scrollbar-thumb-[#0B1F3A]/20 scrollbar-track-transparent">
+              {productVariants.map((variant) => {
+                let variantDisplayName = variant.name;
+                if (activeProductName && variant.name.startsWith(activeProductName)) {
+                  variantDisplayName = variant.name.substring(activeProductName.length).trim();
+                  if (variantDisplayName === "") variantDisplayName = variant.name;
+                }
+                
+                return (
+                  <button
+                    key={variant.id}
+                    onClick={() => {
+                      setSelectedProduct(variant);
+                      setCurrentImageIndex(0);
+                    }}
+                    title={variantDisplayName || variant.name}
+                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 p-0.5 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#0B1F3A] transition-all duration-200 ease-in-out
+                              ${selectedProduct && selectedProduct.id === variant.id
+                                ? 'border-[#0B1F3A] shadow-lg scale-105' // Destaque mais forte para o selecionado
+                                : 'border-transparent hover:border-[#0B1F3A]/50 hover:shadow-md'
+                              }`}
+                  >
+                    <img
+                      src={variant.main_image}
+                      alt={variantDisplayName || variant.name}
+                      className="w-full h-full object-cover rounded-md" // Imagem cobre o botão e é arredondada
+                      loading="lazy"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+
           {/* Produto Detalhe */}
           <section className="py-6">
             
@@ -190,7 +306,7 @@ export default function ProdutoDetalhe() {
                       
                       <img
                         src={allImages[currentImageIndex]}
-                        alt={product.name}
+                        alt={selectedProduct.name}
                         className="w-full h-[400px] md:h-[500px] object-contain cursor-zoom-in transition-opacity"
                         onClick={() => setIsImageExpanded(true)}
                         loading="lazy"
@@ -254,14 +370,16 @@ export default function ProdutoDetalhe() {
                     <div className="absolute top-0 right-0 h-24 w-24 bg-gradient-to-bl from-[#B9A67E]/20 to-transparent rounded-bl-full -z-0"></div>
                     
                     <div className="relative">
-                      <h1 className="font-belleza text-2xl md:text-3xl text-[#0B1F3A] mb-2">{product.name}</h1>
+                      {/* Usar activeProductName para o título principal, que pode ser o nome do grupo ou do produto */}
+                      <h1 className="font-belleza text-2xl md:text-3xl text-[#0B1F3A] mb-2">{activeProductName || selectedProduct?.name}</h1>
+                      {/* As tags de "Novidade" e "Edição Limitada" devem vir do selectedProduct (a variante específica) */}
                       <div className="flex flex-wrap gap-2 mb-1">
-                        {product.is_new && (
+                        {selectedProduct?.is_new && (
                           <span className="bg-[#0B1F3A] text-white text-xs px-3 py-1 rounded-full shadow-sm">
                             Novidade
                           </span>
                         )}
-                        {product.is_limited && (
+                        {selectedProduct?.is_limited && (
                           <span className="bg-[#B9A67E] text-white text-xs px-3 py-1 rounded-full shadow-sm">
                             Edição Limitada
                           </span>
@@ -269,9 +387,9 @@ export default function ProdutoDetalhe() {
                       </div>
                     </div>
 
-                    {product.price != null && product.price !== undefined ? (
+                    {selectedProduct?.price != null && selectedProduct?.price !== undefined ? (
                       <div className="text-2xl font-medium text-[#0B1F3A] bg-[#F4F1EC]/50 py-2 px-4 rounded-lg inline-block">
-                        R$ {product.price.toFixed(2)}
+                        R$ {selectedProduct.price.toFixed(2)}
                       </div>
                     ) : (
                       <div className="text-[#0B1F3A]/70 italic bg-[#F4F1EC]/50 py-2 px-4 rounded-lg inline-block">
@@ -280,14 +398,33 @@ export default function ProdutoDetalhe() {
                     )}
 
                     <div className="prose text-[#0B1F3A]/80 max-w-none border-l-4 border-[#0B1F3A]/10 pl-4 py-1">
-                      {product.description}
+                      {selectedProduct?.description}
                     </div>
 
-                    {product.options && product.options.length > 0 && (
+                    {/* Detalhes Adicionais Movidos */}
+                    <div className="bg-[#F4F1EC]/30 p-4 rounded-lg"> {/* Mantido o estilo, removido mt-6 */}
+                      <h3 className="font-medium text-[#0B1F3A] mb-3">Mais Sobre Este Produto:</h3>
+                      <div className="text-[#0B1F3A]/80 space-y-2 text-sm">
+                        {selectedProduct?.materials && <p><strong>Materiais:</strong> {selectedProduct.materials}</p>}
+                        {selectedProduct?.dimensions && <p><strong>Dimensões:</strong> {typeof selectedProduct.dimensions === 'object' ? `Altura: ${selectedProduct.dimensions.height || '-'}, Largura: ${selectedProduct.dimensions.width || '-'}, Comprimento: ${selectedProduct.dimensions.length || '-'}` : selectedProduct.dimensions}</p>}
+                        {selectedProduct?.careInstructions && <p><strong>Cuidados:</strong> {selectedProduct.careInstructions}</p>}
+                        {selectedProduct?.story && (
+                          <div className="mt-2 pt-2 border-t border-[#0B1F3A]/10">
+                            <h4 className="font-semibold text-[#0B1F3A] mb-1">Propósito e Significado:</h4>
+                            <p className="italic">{selectedProduct.story}</p>
+                          </div>
+                        )}
+                        {/* Placeholder if none of the above specific details exist, but we do have a product */}
+                        {selectedProduct && !(selectedProduct?.materials || selectedProduct?.dimensions || selectedProduct?.careInstructions || selectedProduct?.story) && (
+                          <p className="italic text-[#0B1F3A]/60">Mais detalhes sobre este produto serão adicionados em breve.</p>
+                        )}
+                      </div>
+                    </div>
+                    {selectedProduct?.options && selectedProduct?.options.length > 0 && (
                       <div className="bg-[#F4F1EC]/30 p-4 rounded-lg">
                         <h3 className="font-medium text-[#0B1F3A] mb-3">Opções disponíveis:</h3>
                         <div className="flex flex-wrap gap-2">
-                          {product.options.map((option, index) => (
+                          {selectedProduct.options.map((option, index) => (
                             <span
                               key={index}
                               className="inline-block px-3 py-1 bg-white border border-[#0B1F3A]/10 rounded-full text-sm shadow-sm"
@@ -304,7 +441,7 @@ export default function ProdutoDetalhe() {
                         Para mais informações ou para encomendar este produto, entre em contato:
                       </p>
                       <a
-                        href={product.whatsapp_link || "https://wa.me/5547991106023"}
+                        href={selectedProduct?.whatsapp_link || "https://wa.me/5547991106023"}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center justify-center gap-2 w-full sm:w-auto bg-[#0B1F3A] text-white px-6 py-3 font-medium rounded-xl hover:bg-[#0B1F3A]/90 transition-all hover:shadow-lg hover:-translate-y-1 min-h-[48px]"

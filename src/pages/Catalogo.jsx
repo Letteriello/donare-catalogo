@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Catalogo() {
   const [products, setProducts] = useState([]);
+  const [processedProducts, setProcessedProducts] = useState([]); // New state for grouped/single products
   const [category, setCategory] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -129,6 +130,51 @@ export default function Catalogo() {
     };
   }, [location.search]);
 
+  // useEffect to process products for grouping
+  useEffect(() => {
+    console.log("[DEBUG Catalogo.jsx] Raw products received for processing:", JSON.parse(JSON.stringify(products)));
+    if (!products || products.length === 0) {
+      console.log("[DEBUG Catalogo.jsx] No products or empty products array, setting processedProducts to empty.");
+      setProcessedProducts([]);
+      return;
+    }
+
+    const grouped = {};
+    const singles = [];
+
+    products.forEach(product => {
+      if (product.baseProductName && product.baseProductName.trim() !== "") {
+        if (!grouped[product.baseProductName]) {
+          grouped[product.baseProductName] = {
+            id: product.baseProductName, // Use baseProductName as a unique key for the group
+            name: product.baseProductName,
+            main_image: product.main_image, // Use first product's image for the group
+            description: `Variantes de ${product.baseProductName}`, // Generic description
+            price: product.price, // Use first product's price as representative
+            isGrouped: true,
+            variants: []
+          };
+        }
+        grouped[product.baseProductName].variants.push(product);
+        // Optionally, update price to "A partir de X" or find min price
+        if (grouped[product.baseProductName].variants.length > 1) {
+           // Find the minimum price among variants if desired, or keep the first one
+           const minPrice = grouped[product.baseProductName].variants.reduce((min, p) => {
+            return (p.price !== null && (min === null || p.price < min)) ? p.price : min;
+          }, null);
+          grouped[product.baseProductName].price = minPrice;
+        }
+
+      } else {
+        singles.push({...product, isGrouped: false});
+      }
+    });
+
+    const newProcessedProducts = [...Object.values(grouped), ...singles];
+    console.log("[DEBUG Catalogo.jsx] Processed products (grouped and singles):", JSON.parse(JSON.stringify(newProcessedProducts)));
+    setProcessedProducts(newProcessedProducts);
+  }, [products]);
+
   const handleRetry = () => {
     window.location.reload();
   };
@@ -233,32 +279,38 @@ export default function Catalogo() {
 
             {/* Lista de Produtos - Layout otimizado para mobile */}
                 <div className={`grid ${isMobile ? 'grid-cols-1 gap-8' : 'grid-cols-2 lg:grid-cols-3 gap-6'}`}>
-                  {products.map(product => (
+                  {processedProducts.map(product => (
                     <motion.div
-                      key={product.id}
+                      key={product.id} // This will be baseProductName for grouped, or product.id for singles
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1"
                     >
                       <Link
-                        to={`${createPageUrl("ProdutoDetalhe")}?id=${product.id}`}
+                        to={product.isGrouped ? `${createPageUrl("ProdutoDetalhe")}?id=${product.variants[0].id}&group=${product.name}` : `${createPageUrl("ProdutoDetalhe")}?id=${product.id}`}
                         className="block min-h-[48px]" // Aumenta área clicável
                       >
                         <div className={`${isMobile ? 'h-72' : 'h-64'} overflow-hidden`}>
                           <img
-                            src={product.main_image}
-                            alt={product.name}
+                            src={product.main_image} // For grouped, this is the first variant's image
+                            alt={product.name} // For grouped, this is the baseProductName
                             className="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-110"
                             loading="lazy" // Otimização de carregamento
                           />
                         </div>
                         <div className={`p-6 ${isMobile ? 'pb-8' : ''}`}>
                           <h3 className="font-belleza text-xl sm:text-2xl text-[#0B1F3A] mb-2">{product.name}</h3>
-                          <p className="text-[#0B1F3A]/80 text-sm md:text-base line-clamp-2 mb-4">{product.description}</p>
+                          <p className="text-[#0B1F3A]/80 text-sm md:text-base line-clamp-2 mb-4">
+                            {product.isGrouped ? `Disponível em ${product.variants.length} cores` : product.description}
+                          </p>
                           <div className="flex items-center justify-between">
-                            <span className="text-[#0B1F3A] font-semibold text-lg">
-                              {product.price != null ? `R$ ${product.price.toFixed(2)}` : "Sob consulta"}
-                            </span>
+                            {!product.isGrouped && (
+                              <span className="text-[#0B1F3A] font-semibold text-lg">
+                                {product.price != null
+                                  ? `R$ ${product.price.toFixed(2)}`
+                                  : "Sob consulta"}
+                              </span>
+                            )}
                             {isMobile && (
                               <span className="text-sm text-[#0B1F3A]/60 underline">Ver detalhes</span>
                             )}
@@ -268,9 +320,9 @@ export default function Catalogo() {
                     </motion.div>
               ))}
             </div>
-
+ 
             {/* Mensagem quando não há produtos - Com melhor design */}
-            {products.length === 0 && (
+            {processedProducts.length === 0 && (
               <div className="text-center py-16 bg-white/50 rounded-xl border border-[#0B1F3A]/10 backdrop-blur-sm">
                 <div className="max-w-md mx-auto px-6">
                   <h3 className="font-belleza text-xl text-[#0B1F3A] mb-3">Nenhum produto encontrado</h3>

@@ -113,14 +113,18 @@ export const Product = {
       // Garantir que o campo categoryId seja uma string
       const productToSave = {
         ...productData,
-        categoryId: String(productData.categoryId),
+        categoryId: String(productData.categoryId), // Garante que categoryId seja uma string
         priceRetail: productData.priceRetail || null,
         priceWholesale: productData.priceWholesale || null,
-        dimensions: {
-          height: productData.dimensions?.height || null,
-          width: productData.dimensions?.width || null,
-          length: productData.dimensions?.length || null,
-        },
+        // Campo 'dimensions' agora é uma string
+        dimensions: productData.dimensions || "", // Salva a string de dimensões diretamente
+        // Novos campos para detalhes do produto e SEO
+        materials: productData.materials || "",
+        careInstructions: productData.careInstructions || "",
+        story: productData.story || "",
+        metaTitle: productData.metaTitle || "",
+        metaDescription: productData.metaDescription || "",
+        keywords: productData.keywords || "",
         createdAt: serverTimestamp()
       };
       
@@ -279,6 +283,74 @@ export const Category = {
       return { success: true };
     } catch (error) {
       console.error('Erro ao excluir categoria:', error);
+      throw error;
+    }
+  }
+};
+
+// Entidade Color
+export const Color = {
+  list: async () => {
+    try {
+      const colorsQuery = query(collection(db, 'colors'), orderBy('name'));
+      const snapshot = await getDocs(colorsQuery);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+    } catch (error) {
+      console.error('Erro ao listar cores:', error);
+      return [];
+    }
+  },
+
+  get: async (id) => {
+    try {
+      const docRef = doc(db, 'colors', id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return { ...docSnap.data(), id: docSnap.id };
+      } else {
+        console.log('Cor não encontrada');
+        return null;
+      }
+    } catch (error) {
+      console.error('Erro ao buscar cor:', error);
+      return null;
+    }
+  },
+
+  create: async (colorData) => { // Expects { name: string, hex: string }
+    try {
+      const docRef = await addDoc(collection(db, 'colors'), {
+        ...colorData,
+        createdAt: serverTimestamp()
+      });
+      return { ...colorData, id: docRef.id };
+    } catch (error) {
+      console.error('Erro ao criar cor:', error);
+      throw error;
+    }
+  },
+
+  update: async (id, colorData) => { // Expects { name?: string, hex?: string }
+    try {
+      const docRef = doc(db, 'colors', id);
+      await updateDoc(docRef, {
+        ...colorData,
+        updatedAt: serverTimestamp()
+      });
+      return { id, ...colorData };
+    } catch (error) {
+      console.error('Erro ao atualizar cor:', error);
+      throw error;
+    }
+  },
+
+  delete: async (id) => {
+    try {
+      const docRef = doc(db, 'colors', id);
+      await deleteDoc(docRef);
+      return { success: true, id };
+    } catch (error) {
+      console.error('Erro ao excluir cor:', error);
       throw error;
     }
   }

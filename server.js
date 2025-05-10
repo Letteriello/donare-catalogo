@@ -72,37 +72,131 @@ const upload = multer({
   }
 });
 
-// Função para processar o upload
-const processUpload = (req, res) => {
+// Função para processar o upload de um único arquivo
+const processSingleUpload = (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
-    
-    // Constrói um caminho relativo para o arquivo
-    // req.file.path é algo como "public/uploads/products/123-image.png"
-    // Precisamos transformá-lo em "/uploads/products/123-image.png"
     const relativePath = req.file.path.replace(/^public[\\/]/, '/').replace(/\\/g, '/');
-    
     res.json({
       success: true,
-      file_url: relativePath, // O frontend irá prefixar com window.location.origin
+      file_url: relativePath,
       message: 'Arquivo enviado com sucesso',
     });
   } catch (error) {
-    console.error('Erro no upload:', error);
+    console.error('Erro no upload single:', error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Erro no upload do arquivo',
+      error: error.message || 'Erro no upload do arquivo single',
     });
   }
 };
 
-// Rota para upload com tipo específico
-app.post('/api/upload/:type', upload.single('file'), processUpload);
+// Função para processar o upload de múltiplos arquivos
+const processBatchUpload = (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    }
+    
+    const filesInfo = req.files.map(file => {
+      const relativePath = file.path.replace(/^public[\\/]/, '/').replace(/\\/g, '/');
+      return {
+        id: file.filename, // Usando o nome do arquivo gerado como ID
+        url: relativePath
+      };
+    });
+    
+    res.json(filesInfo); // Retorna diretamente o array [{id, url}]
 
-// Rota para upload sem tipo específico (usará 'products' como padrão)
-app.post('/api/upload', upload.single('file'), processUpload);
+  } catch (error) {
+    console.error('Erro no upload em lote:', error);
+    res.status(500).json({
+      // success: false, // O formato de retorno é um array, não um objeto com success
+      error: error.message || 'Erro no upload dos arquivos em lote',
+    });
+  }
+};
+
+// Rota para upload com tipo específico (single file)
+app.post('/api/upload/:type', upload.single('file'), processSingleUpload);
+
+// Rota para upload em lote (multiple files, usará 'products' como padrão se req.params.type não for usado no storage)
+// O storage já usa 'products' como default se 'type' não está no req.params, o que é bom.
+app.post('/api/uploads', upload.array('files', 10), processBatchUpload); // 'files' é o nome do campo esperado
+
+// --- Product Routes ---
+// POST /api/products ⇒ cria pai + variantes numa transação
+app.post('/api/products', (req, res) => {
+  console.log('[SERVER.JS LOG] POST /api/products - Body:', req.body);
+  // Placeholder: Simular criação de produto e variantes
+  const newProduct = { id: `prod_${Date.now()}`, ...req.body, variantsCount: req.body.variants?.length || 0 };
+  console.log('[SERVER.JS LOG] Simulated new product:', newProduct);
+  res.status(201).json(newProduct);
+});
+
+// PUT /api/products/:id ⇒ atualiza pai + variantes
+app.put('/api/products/:id', (req, res) => {
+  const { id } = req.params;
+  console.log(`[SERVER.JS LOG] PUT /api/products/${id} - Body:`, req.body);
+  // Placeholder: Simular atualização de produto
+  const updatedProduct = { id, ...req.body };
+  console.log('[SERVER.JS LOG] Simulated updated product:', updatedProduct);
+  res.json(updatedProduct);
+});
+
+// --- Color Routes ---
+let mockColors = [
+  { id: 'color_1', name: 'Vermelho', hex: '#FF0000' },
+  { id: 'color_2', name: 'Azul', hex: '#0000FF' },
+  { id: 'color_3', name: 'Verde', hex: '#00FF00' },
+];
+
+// GET /api/colors
+app.get('/api/colors', (req, res) => {
+  console.log('[SERVER.JS LOG] GET /api/colors');
+  res.json(mockColors);
+});
+
+// POST /api/colors
+app.post('/api/colors', (req, res) => {
+  console.log('[SERVER.JS LOG] POST /api/colors - Body:', req.body);
+  const { name, hex } = req.body;
+  if (!name || !hex) {
+    return res.status(400).json({ error: 'Name and hex are required for color' });
+  }
+  const newColor = { id: `color_${Date.now()}`, name, hex };
+  mockColors.push(newColor);
+  console.log('[SERVER.JS LOG] Added new color:', newColor);
+  res.status(201).json(newColor);
+});
+
+// --- Category Routes ---
+let mockCategories = [
+  { id: 'cat_1', name: 'Mesa Posta' },
+  { id: 'cat_2', name: 'Decoração' },
+  { id: 'cat_3', name: 'Cozinha' },
+];
+
+// GET /api/categories
+app.get('/api/categories', (req, res) => {
+  console.log('[SERVER.JS LOG] GET /api/categories');
+  res.json(mockCategories);
+});
+
+// POST /api/categories
+app.post('/api/categories', (req, res) => {
+  console.log('[SERVER.JS LOG] POST /api/categories - Body:', req.body);
+  const { name } = req.body;
+  if (!name) {
+    return res.status(400).json({ error: 'Name is required for category' });
+  }
+  const newCategory = { id: `cat_${Date.now()}`, name };
+  mockCategories.push(newCategory);
+  console.log('[SERVER.JS LOG] Added new category:', newCategory);
+  res.status(201).json(newCategory);
+});
 
 // Rota de teste simples para POST
 app.post('/testpost', (req, res) => {

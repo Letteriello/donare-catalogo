@@ -143,7 +143,7 @@ export default function Home() {
         <div className="flex justify-end mt-4">
           <button
             onClick={handleLogout}
-            className="bg-[#f5f2f0] text-[#0B1F3A]/60 hover:text-[#0B1F3A] flex items-center gap-2 py-2 px-4 rounded-full text-sm hover:bg-white transition-all shadow-sm hover:shadow"
+            className="bg-[#f5f2f0] text-[#0B1F3A]/60 hover:text-[#0B1F3A] flex items-center gap-2 py-2.5 px-5 rounded-lg text-sm hover:bg-white transition-all duration-300 shadow-sm hover:shadow-md border border-transparent hover:border-[#0B1F3A]/10"
           >
             <LogOut size={16} />
             Sair
@@ -167,14 +167,14 @@ export default function Home() {
             <div className="flex-1">
               <h1 className="font-belleza text-4xl md:text-5xl text-[#0B1F3A] relative">
                 Donare Home
-                <span className="absolute -bottom-2 left-0 w-20 h-1 bg-gradient-to-r from-[#B9A67E] to-transparent"></span>
+                <span className="absolute -bottom-2 left-0 w-24 h-[2px] bg-gradient-to-r from-[#B9A67E]/80 to-transparent"></span>
               </h1>
               <p className="text-[#0B1F3A]/60 font-light mt-1">Catálogo</p>
               <Link
                 to="/"
-                className="inline-flex items-center gap-2 mt-3 py-2 px-4 bg-white rounded-xl text-[#0B1F3A]/80 hover:text-[#0B1F3A] text-sm shadow-sm hover:shadow transition-all hover:bg-[#F4F1EC] border border-transparent hover:border-[#0B1F3A]/10"
+                className="inline-flex items-center gap-1.5 mt-4 text-[#0B1F3A]/60 hover:text-[#0B1F3A] text-sm transition-colors duration-300 group focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#B9A67E]/80 focus-visible:text-[#0B1F3A] rounded"
               >
-                <ChevronLeft size={16} /> Voltar para o Início
+                <ChevronLeft size={16} className="transition-transform duration-300 ease-out group-hover:-translate-x-0.5 group-focus-visible:-translate-x-0.5" /> Voltar para o Início
               </Link>
             </div>
             
@@ -182,8 +182,8 @@ export default function Home() {
           </div>
           
           {/* Banner com Slogan da Marca */}
-          <div className={`${isMobile ? 'mt-8 mb-6' : 'mt-12 mb-10'} bg-white/80 backdrop-blur-sm rounded-xl p-6 text-center shadow-sm border border-[#0B1F3A]/5`}>
-            <p className="font-belleza text-xl md:text-2xl text-[#0B1F3A]/90">
+          <div className={`${isMobile ? 'mt-8 mb-6' : 'mt-12 mb-10'} bg-white/80 backdrop-blur-md rounded-xl p-6 md:p-8 text-center shadow-md border border-[#B9A67E]/30`}>
+            <p className="font-belleza text-xl md:text-3xl text-[#0B1F3A] tracking-wider">
               &ldquo;A estética do lar com propósito e significado&rdquo;
             </p>
           </div>
@@ -215,28 +215,43 @@ export default function Home() {
               className="max-w-3xl mx-auto"
             >
               {categories.length > 0 ? (
-                <div className={`${isMobile ? 'space-y-4' : 'grid grid-cols-2 gap-4'}`}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
                   {categories.map((category) => (
                     <motion.div
                       key={category.id}
                       variants={fadeIn}
-                      className="h-full"
+                      className="h-full" // Garante que o motion.div ocupe a altura do Link
                     >
                       <Link
                         to={`/catalog?categoria=${category.id}`}
-                        className="block h-full bg-white rounded-xl p-6 shadow-sm hover:shadow-lg transition-all border border-[#0B1F3A]/5 overflow-hidden relative group"
+                        className="block h-60 sm:h-72 md:h-80 bg-neutral-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out overflow-hidden relative group"
                       >
-                        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-[#B9A67E] to-transparent transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
-                        <div className="flex justify-between items-center">
-                          <h2 className="text-xl font-belleza">{category.name}</h2>
-                          <ArrowRight
-                            size={20}
-                            className="text-[#0B1F3A]/40 group-hover:text-[#0B1F3A] transform translate-x-0 group-hover:translate-x-1 transition-all"
+                        {/* Imagem de fundo da categoria */}
+                        {category.imageUrl ? (
+                          <img
+                            src={category.imageUrl}
+                            alt={category.name}
+                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" // Efeito de zoom mais suave e pronunciado
+                            loading="lazy"
                           />
-                        </div>
-                        {category.description && (
-                          <p className="text-[#0B1F3A]/60 text-sm mt-2 line-clamp-2">{category.description}</p>
+                        ) : (
+                          // Fallback se não houver imagem, pode ser uma cor ou padrão elegante
+                          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-[#B9A67E]/20 to-[#0B1F3A]/20 flex items-center justify-center">
+                            <span className="text-[#0B1F3A]/70 font-belleza text-lg">Donare</span>
+                          </div>
                         )}
+                        
+                        {/* Overlay sutil para estética e legibilidade */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent/5 opacity-80 group-hover:opacity-100 transition-opacity duration-300"></div>
+                        
+                        {/* Conteúdo do Card (Nome da Categoria e Call to action) */}
+                        <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6 text-white z-10">
+                          <h2 className="text-2xl md:text-3xl font-belleza mb-2 drop-shadow-sm">{category.name}</h2>
+                          <div className="flex items-center text-sm font-light opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300 ease-out">
+                            Explorar categoria
+                            <ArrowRight size={18} className="ml-2 opacity-70" />
+                          </div>
+                        </div>
                       </Link>
                     </motion.div>
                   ))}
@@ -261,7 +276,7 @@ export default function Home() {
                 className={`
                   inline-flex items-center justify-center gap-2
                   ${isMobile ? 'py-3 px-5 text-sm' : 'py-3 px-6 text-sm'}
-                  bg-white hover:bg-[#F4F1EC] rounded-xl
+                  bg-white hover:bg-[#F4F1EC] rounded-lg
                   text-[#0B1F3A]/60 hover:text-[#0B1F3A]
                   shadow-sm hover:shadow
                   border border-[#0B1F3A]/5 hover:border-[#0B1F3A]/10
@@ -273,7 +288,7 @@ export default function Home() {
               </button>
               
               {loginError && (
-                <div className="mt-4 text-red-500 bg-red-50 p-4 rounded-xl border border-red-100 max-w-sm mx-auto">
+                <div className="mt-4 text-red-600 bg-red-50/80 p-4 rounded-lg border border-red-200/70 max-w-sm mx-auto text-sm shadow-sm">
                   {loginError}
                 </div>
               )}
@@ -284,7 +299,7 @@ export default function Home() {
               <Button
                 asChild
                 size={isMobile ? "xl" : "default"}
-                className="bg-[#0B1F3A] text-white rounded-xl shadow-sm hover:shadow-md relative min-h-[48px]"
+                className="bg-[#0B1F3A] text-white rounded-lg shadow-sm hover:shadow-md relative min-h-[48px] transition-all duration-300 hover:bg-[#0A1A30]"
               >
                 <Link to="/admin">
                   <Settings size={isMobile ? 20 : 16} className={!isMobile ? "mr-2" : ""} />
