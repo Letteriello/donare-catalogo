@@ -9,6 +9,7 @@ import CategoryManager from "../components/admin/CategoryManager";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useIsMobile } from "@/hooks/use-mobile"; // Corrected path assuming jsconfig.json paths
 import { Button } from "@/components/ui/button"; // Corrected path assuming jsconfig.json paths
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"; // Corrected path assuming jsconfig.json paths
 
 export default function Admin() {
   const [activeView, setActiveView] = React.useState(null);
@@ -79,27 +80,31 @@ export default function Admin() {
               transition={{ duration: 0.5 }}
               className="grid gap-4 max-w-xl mx-auto"
             >
-              <button
+              <Card
                 onClick={() => setActiveView('products')}
-                className="flex items-center p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all text-left hover:scale-[1.02]"
+                className="shadow-sm hover:shadow-md transition-all hover:scale-[1.02] cursor-pointer rounded-xl"
               >
-                <Package size={24} className="text-[#0B1F3A] mr-4" />
-                <div>
-                  <h2 className="text-lg sm:text-xl font-belleza text-[#0B1F3A]">Produtos</h2>
-                  <p className="text-[#0B1F3A]/70 text-sm">Gerenciar produtos do catálogo</p>
-                </div>
-              </button>
+                <CardHeader className="flex flex-row items-center space-x-4 p-6">
+                  <Package size={28} className="text-[#0B1F3A]" />
+                  <div>
+                    <CardTitle className="text-lg sm:text-xl font-belleza text-[#0B1F3A]">Produtos</CardTitle>
+                    <CardDescription className="text-[#0B1F3A]/70 text-sm">Gerenciar produtos do catálogo</CardDescription>
+                  </div>
+                </CardHeader>
+              </Card>
 
-              <button
+              <Card
                 onClick={() => setActiveView('categories')}
-                className="flex items-center p-6 bg-white rounded-xl shadow-sm hover:shadow-md transition-all text-left hover:scale-[1.02]"
+                className="shadow-sm hover:shadow-md transition-all hover:scale-[1.02] cursor-pointer rounded-xl"
               >
-                <Layers size={24} className="text-[#0B1F3A] mr-4" />
-                <div>
-                  <h2 className="text-lg sm:text-xl font-belleza text-[#0B1F3A]">Categorias</h2>
-                  <p className="text-[#0B1F3A]/70 text-sm">Gerenciar categorias do catálogo</p>
-                </div>
-              </button>
+                <CardHeader className="flex flex-row items-center space-x-4 p-6">
+                  <Layers size={28} className="text-[#0B1F3A]" /> {/* Ajustado size para consistência, se desejado */}
+                  <div>
+                    <CardTitle className="text-lg sm:text-xl font-belleza text-[#0B1F3A]">Categorias</CardTitle>
+                    <CardDescription className="text-[#0B1F3A]/70 text-sm">Gerenciar categorias do catálogo</CardDescription>
+                  </div>
+                </CardHeader>
+              </Card>
 
             </motion.div>
           ) : (

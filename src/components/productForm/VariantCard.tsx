@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { XCircle, ImagePlus, Trash2, Star } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { v4 as uuidv4 } from 'uuid';
 
 interface VariantCardProps {
   variant: Variant;
@@ -20,19 +22,62 @@ export const VariantCard: React.FC<VariantCardProps> = ({ variant, onChange, onR
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    let processedValue: string | number = value;
-
-    if (name === 'retail' || name === 'wholesale') {
-      processedValue = parseFloat(value);
-      if (isNaN(processedValue)) {
-        processedValue = 0;
-      }
-    }
     
     onChange({ 
       ...variant, 
-      [name]: processedValue
+      [name]: value
     });
+  };
+
+  // Função para lidar com upload de imagens por clique
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Processar cada arquivo selecionado
+    files.forEach(async (file) => {
+      try {
+        // Criar FormData para enviar o arquivo
+        const formData = new FormData();
+        formData.append('files', file);
+
+        // Enviar o arquivo para o servidor
+        const response = await fetch('/api/uploads', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Erro ao fazer upload: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data && data.length > 0) {
+          const fileInfo = data[0];
+          // Formatar a URL absoluta
+          const fileUrl = `${window.location.origin}${fileInfo.url}`;
+          
+          // Adicionar a imagem à variante atual
+          const imageId = uuidv4();
+          onAssignImageToVariant(variant.id, imageId, fileUrl);
+          
+          toast({
+            title: "Imagem adicionada",
+            description: `Imagem "${file.name}" adicionada à variante ${variant.color}.`,
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao fazer upload de imagem:', error);
+        toast({
+          variant: "destructive",
+          title: "Erro no upload",
+          description: `Não foi possível enviar a imagem "${file.name}".`,
+        });
+      }
+    });
+
+    // Limpar o input file para permitir selecionar o mesmo arquivo novamente
+    e.target.value = '';
   };
 
   const handleSetCoverImage = (imageUrl: string) => {
@@ -75,13 +120,7 @@ export const VariantCard: React.FC<VariantCardProps> = ({ variant, onChange, onR
           toast({ variant: "default", title: "Image Exists", description: `Image "${originalName}" is already assigned to this variant.` });
           return;
         }
-        // Call the new prop to notify ProductForm that an unassigned image is now assigned
         onAssignImageToVariant(variant.id, imageId, imageUrl);
-        // The actual addition to variant.images will be handled by ProductForm through onChange
-        // after it removes the image from unassignedImages.
-        // For now, directly update here to show immediate effect,
-        // but ProductForm should be the source of truth for this change.
-        // onChange({ ...variant, images: [...variant.images, imageUrl] });
         toast({ title: "Image Assigned", description: `Image "${originalName}" dropped onto ${variant.color}.` });
 
       } else {
@@ -93,120 +132,150 @@ export const VariantCard: React.FC<VariantCardProps> = ({ variant, onChange, onR
     }
   };
 
-
   return (
-    <Card 
-      className={`w-full transition-all ${isDragOver ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div className="flex items-center space-x-2">
-          <div 
-            className="w-6 h-6 rounded-full border" 
-            style={{ backgroundColor: variant.hex || '#ccc' }}
-            title={variant.hex}
-          />
-          <CardTitle className="text-lg font-medium">{variant.color}</CardTitle>
-        </div>
-        <Button variant="ghost" size="sm" onClick={() => onRemove(variant.id)} title="Remove Variant">
-          <XCircle className="h-5 w-5 text-destructive" />
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div>
-          <Label htmlFor={`retail-${variant.id}`}>Retail Price</Label>
-          <Input
-            id={`retail-${variant.id}`}
-            name="retail"
-            type="number"
-            placeholder="e.g., 29.90"
-            value={variant.retail ?? ''}
-            onChange={handleInputChange}
-            min="0"
-            step="0.01"
-          />
-        </div>
-        <div>
-          <Label htmlFor={`wholesale-${variant.id}`}>Wholesale Price</Label>
-          <Input
-            id={`wholesale-${variant.id}`}
-            name="wholesale"
-            type="number"
-            placeholder="e.g., 19.90"
-            value={variant.wholesale ?? ''}
-            onChange={handleInputChange}
-            min="0"
-            step="0.01"
-          />
-        </div>
-        
-        <div className="mt-4 space-y-2">
-          <Label>Images ({variant.images.length})</Label>
-          <div 
-            className={`mt-1 p-2 border border-dashed rounded-md min-h-[100px] flex flex-col items-center justify-center transition-colors
-                        ${isDragOver ? 'bg-primary-foreground border-primary' : 'border-muted-foreground/30 hover:border-muted-foreground/70'}`}
-          >
-            {variant.images.length === 0 ? (
-              <div className="text-center text-xs text-muted-foreground py-4">
-                <ImagePlus className="mx-auto h-8 w-8 mb-1" />
-                Drag an image here or it will be auto-assigned.
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2 w-full">
-                {variant.images.map((imgUrl, idx) => (
-                  <div key={imgUrl || idx} className="relative group aspect-square border rounded overflow-hidden">
-                    <img 
-                      src={imgUrl} 
-                      alt={`Variant ${variant.color} image ${idx + 1}`} 
-                      className="w-full h-full object-cover" 
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-1 p-1">
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-7 w-7 bg-white/80 hover:bg-white"
-                        title="Set as Cover"
-                        onClick={() => handleSetCoverImage(imgUrl)}
-                        disabled={idx === 0} // Already cover if first
-                      >
-                        <Star className={`h-4 w-4 ${idx === 0 ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground'}`} />
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="icon" 
-                        className="h-7 w-7"
-                        title="Remove Image"
-                        onClick={() => handleRemoveImageFromVariant(imgUrl)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {idx === 0 && (
-                       <div className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-sm flex items-center">
-                         <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-500" /> Cover
-                       </div>
-                    )}
-                  </div>
-                ))}
-                 {/* Add more images placeholder if fewer than max, e.g. 3 */}
-                {variant.images.length < 6 && ( // Example: allow up to 6 images
-                    <div 
-                        className={`aspect-square flex items-center justify-center border-2 border-dashed rounded 
-                                    ${isDragOver ? 'border-primary bg-primary-foreground' : 'border-muted-foreground/30 hover:border-muted-foreground/60'} 
-                                    cursor-pointer transition-colors`}
-                        onClick={() => { /* Potentially open a file dialog or highlight the main uploader */ }}
-                        title="Drag another image here"
-                    >
-                        <ImagePlus className={`h-6 w-6 ${isDragOver ? 'text-primary' : 'text-muted-foreground/70'}`} />
-                    </div>
-                )}
-              </div>
-            )}
+    <TooltipProvider>
+      <Card 
+        className={`w-full transition-all ${isDragOver ? 'ring-2 ring-primary ring-offset-2' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div className="flex items-center space-x-2">
+            <div 
+              className="w-6 h-6 rounded-full border" 
+              style={{ backgroundColor: variant.hex || '#ccc' }}
+              title={variant.hex} 
+            />
+            <CardTitle className="text-lg font-medium">{variant.color}</CardTitle>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="sm" onClick={() => onRemove(variant.id)} aria-label="Remover Variante">
+                <XCircle className="h-5 w-5 text-destructive" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Remover Variante</p>
+            </TooltipContent>
+          </Tooltip>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 gap-4 mt-4">
+
+          </div>
+          
+          <div className="mt-4 space-y-2">
+            <Label>Images ({variant.images.length})</Label>
+            <div 
+              className={`mt-1 p-2 border border-dashed rounded-md min-h-[100px] flex flex-col items-center justify-center transition-colors
+                          ${isDragOver ? 'bg-primary-foreground border-primary' : 'border-muted-foreground/30 hover:border-muted-foreground/70'} 
+                          cursor-pointer transition-colors`}
+            >
+              {variant.images.length === 0 ? (
+                <div className="text-center text-xs text-muted-foreground py-4">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <label htmlFor={`file-upload-${variant.id}`} className="flex flex-col items-center justify-center h-40 border-2 border-dashed rounded p-4 text-muted-foreground text-center cursor-pointer hover:border-primary hover:text-primary transition-colors">
+                        <input
+                          id={`file-upload-${variant.id}`}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={handleImageUpload}
+                        />
+                        <ImagePlus className="h-8 w-8 mb-2" />
+                        <span>Arraste imagens ou clique para enviar</span>
+                      </label>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Arraste imagens para esta variante</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  Arraste imagens para esta variante.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 gap-2 w-full">
+                  {variant.images.map((imgUrl, idx) => (
+                    <div key={imgUrl || idx} className="relative group aspect-square border rounded overflow-hidden">
+                      <img 
+                        src={imgUrl} 
+                        alt={`Variant ${variant.color} image ${idx + 1}`} 
+                        className="w-full h-full object-cover" 
+                      />
+                      <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center space-y-1 p-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-7 w-7 bg-white/80 hover:bg-white"
+                              aria-label="Definir como imagem de capa"
+                              onClick={() => handleSetCoverImage(imgUrl)}
+                              disabled={idx === 0}
+                            >
+                              <Star className={`h-4 w-4 ${idx === 0 ? 'fill-yellow-400 text-yellow-500' : 'text-muted-foreground'}`} />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Definir como imagem de capa</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              variant="destructive" 
+                              size="icon" 
+                              className="h-7 w-7"
+                              aria-label="Remover imagem da variante"
+                              onClick={() => handleRemoveImageFromVariant(imgUrl)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Remover imagem da variante</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      {idx === 0 && (
+                         <div className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-sm flex items-center">
+                           <Star className="h-3 w-3 mr-1 fill-yellow-400 text-yellow-500" /> Cover
+                         </div>
+                      )}
+                    </div>
+                  ))}
+                  {variant.images.length < 6 && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <label htmlFor={`file-add-${variant.id}`}
+                              className={`aspect-square flex items-center justify-center border-2 border-dashed rounded 
+                                          ${isDragOver ? 'border-primary bg-primary-foreground' : 'border-muted-foreground/30 hover:border-primary'} 
+                                          cursor-pointer transition-colors`}
+                          >
+                              <input
+                                id={`file-add-${variant.id}`}
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                className="hidden"
+                                onChange={handleImageUpload}
+                              />
+                              <ImagePlus className={`h-6 w-6 ${isDragOver ? 'text-primary' : 'text-muted-foreground/70'}`} />
+                          </label>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Arraste uma imagem ou clique para adicionar</p>
+                        </TooltipContent>
+                      </Tooltip>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </TooltipProvider>
   );
 };

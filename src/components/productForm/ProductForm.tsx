@@ -2,17 +2,34 @@ import React, { useState, useEffect } from 'react';
 import ColorThief from 'colorthief';
 import { useProductDraftStore } from '@/stores/useProductDraftStore';
 import { useToast } from '@/components/ui/use-toast';
+import { PREDEFINED_COLORS } from '@/lib/predefinedColors';
 import { ProductDraft, Variant } from '@/types/product';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { CategoryModal } from './CategoryModal';
 import { ColorModal, Color } from './ColorModal';
 import { VariantCard } from './VariantCard';
 import { ImageUploader, UnassignedImage } from './ImageUploader';
 import { ProgressSidebar } from './ProgressSidebar';
 import { DimensionsModal } from './DimensionsModal'; // Added
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  Save,
+  Send,
+  Palette,
+  Settings2,
+  ListFilter,
+  Ruler,
+  Info,
+  ImageUp,
+  Search,
+  Tags,
+  X, // Added
+} from 'lucide-react';
 
 interface UploadedFileResponse {
   fileId: string;
@@ -87,6 +104,7 @@ export const ProductForm: React.FC = () => {
   const [isDimensionsModalOpen, setIsDimensionsModalOpen] = useState(false); // Added
   const [selectedCategoryName, setSelectedCategoryName] = useState<string | null>(null);
   const [unassignedImages, setUnassignedImages] = useState<UnassignedImage[]>([]);
+  const [currentKeywordInput, setCurrentKeywordInput] = useState('');
 
   const handleDimensionsSave = (dimensionsString: string) => { // Added
     setDimensions(dimensionsString);
@@ -114,23 +132,32 @@ export const ProductForm: React.FC = () => {
 
   const handleColorsChosen = (chosenColors: Color[]) => {
     setIsColorModalOpen(false);
-    const currentVariants = draft.variants;
-    const newVariantsToAdd: Variant[] = [];
+    
+    // Preservar imagens e informações das variantes existentes que foram selecionadas novamente
+    const variantsToKeep = draft.variants.filter(variant => 
+      chosenColors.some(color => color.name === variant.color)
+    );
+    
+    // Criar novas variantes para cores selecionadas que não existiam anteriormente
+    const existingColorNames = variantsToKeep.map(v => v.color);
+    const newVariants: Variant[] = [];
+    
     chosenColors.forEach(color => {
-      if (!currentVariants.find(v => v.color === color.name)) {
-        newVariantsToAdd.push({
+      if (!existingColorNames.includes(color.name)) {
+        newVariants.push({
           id: `variant-${color.id || color.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
           color: color.name,
           hex: color.hex,
           images: [],
+          sku: '',
           retail: 0,
           wholesale: 0,
         });
       }
     });
-    if (newVariantsToAdd.length > 0) {
-      setVariants([...currentVariants, ...newVariantsToAdd]);
-    }
+    
+    // Definir apenas as variantes selecionadas (preservadas + novas)
+    setVariants([...variantsToKeep, ...newVariants]);
   };
 
   const processImageWithColorThief = async (imageFile: UnassignedImage, productVariants: Variant[]): Promise<UnassignedImage> => {
@@ -260,7 +287,7 @@ export const ProductForm: React.FC = () => {
     } else if (finalUnassignedImages.length > 0 && autoAssignedByNameCount === 0 && suggestedCount === 0) { // Only unassigned, no suggestions
        toast({
             title: "Uploads Requerem Atribuição",
-            description: `${finalUnassignedImages.length} imagem(ns) adicionadas a não atribuídas. Por favor, atribua-as manualmente.`,
+            description: `${finalUnassignedImages.length} imagem(ns) adicionadas a não atribuídas. Por favor, atribua-as manually.`,
         });
     }
   };
@@ -350,8 +377,25 @@ export const ProductForm: React.FC = () => {
     setSeoDescription(e.target.value);
   };
 
-  const handleKeywordsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setKeywords(e.target.value.split(',').map(kw => kw.trim()).filter(kw => kw !== ''));
+  const handleAddKeyword = () => {
+    const newKeyword = currentKeywordInput.trim();
+    const currentKeywords = draft.keywords || [];
+    if (newKeyword && !currentKeywords.includes(newKeyword)) {
+      setKeywords([...currentKeywords, newKeyword]);
+    }
+    setCurrentKeywordInput(''); // Limpar input
+  };
+
+  const handleRemoveKeyword = (keywordToRemove: string) => {
+    const currentKeywords = draft.keywords || [];
+    setKeywords(currentKeywords.filter(keyword => keyword !== keywordToRemove));
+  };
+
+  const handleKeywordInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault(); // Evitar comportamento padrão (ex: submit, vírgula no input)
+      handleAddKeyword();
+    }
   };
 
   const fetchAiSuggestions = async () => {
@@ -467,152 +511,213 @@ export const ProductForm: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 space-y-6">
           {/* Basic Product Info */}
-          <div className="p-6 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Informações do Produto</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="baseName">Nome Base</Label>
-                <Input 
-                  id="baseName" 
-                  value={draft.baseName} 
-                  onChange={handleBaseNameChange}
-                  placeholder="Ex: Porta Copo Redondo"
-                />
-              </div>
-              <div>
-                <Label htmlFor="category">Categoria</Label>
-                <div className="flex items-center space-x-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações do Produto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <div className="flex items-center">
+                    <Label htmlFor="baseName" className="text-sm font-medium">Nome Base do Produto (Agrupador)</Label>
+                    <TooltipProvider>
+                      <Tooltip delayDuration={300}>
+                        <TooltipTrigger asChild>
+                          <Info className="ml-2 h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">
+                            Usado para agrupar produtos com variações (ex: "Sofá XYZ").
+                            Se este produto é uma variação de um produto base já existente,
+                            digite o nome exato do produto base aqui. Deixe em branco se for um item único sem variações diretas ou se este for o primeiro de um novo grupo.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <Input
-                    id="categoryDisplay"
-                    value={selectedCategoryName || 'Nenhuma categoria selecionada'}
-                    readOnly
-                    className="flex-1"
+                    id="baseName"
+                    value={draft.baseName}
+                    onChange={handleBaseNameChange}
+                    placeholder="Ex: Porta Copo Redondo"
                   />
-                  <Button variant="outline" onClick={() => setIsCategoryModalOpen(true)}>
-                    {draft.categoryId ? 'Alterar' : 'Selecionar'} Categoria
-                  </Button>
+                </div>
+                <div>
+                  <Label htmlFor="category">Categoria</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="categoryDisplay"
+                      value={selectedCategoryName || 'Nenhuma categoria selecionada'}
+                      readOnly
+                      className="flex-1"
+                    />
+                    <Button variant="outline" onClick={() => setIsCategoryModalOpen(true)}>
+                      <ListFilter className="mr-2 h-4 w-4" />
+                      {draft.categoryId ? 'Alterar' : 'Selecionar'} Categoria
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="material">Material</Label>
+                  <Input
+                    id="material"
+                    value={draft.material}
+                    onChange={handleMaterialChange}
+                    placeholder="Ex: Couro Vegano Premium"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dimensionsDisplay">Dimensões</Label>
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="dimensionsDisplay"
+                      value={draft.dimensions || 'Nenhuma dimensão definida'}
+                      readOnly
+                      className="flex-1"
+                    />
+                    <Button variant="outline" onClick={() => setIsDimensionsModalOpen(true)}>
+                      <Ruler className="mr-2 h-4 w-4" />
+                      {draft.dimensions ? 'Editar' : 'Definir'} Dimensões
+                    </Button>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="description">Descrição do Produto</Label>
+                  <Textarea
+                    id="description"
+                    value={draft.description}
+                    onChange={handleDescriptionChange}
+                    placeholder="Descrição detalhada do produto..."
+                    rows={4}
+                  />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="material">Material</Label>
-                <Input
-                  id="material"
-                  value={draft.material}
-                  onChange={handleMaterialChange}
-                  placeholder="Ex: Couro Vegano Premium"
-                />
-              </div>
-              <div>
-                <Label htmlFor="dimensionsDisplay">Dimensões</Label>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    id="dimensionsDisplay"
-                    value={draft.dimensions || 'Nenhuma dimensão definida'}
-                    readOnly
-                    className="flex-1"
-                  />
-                  <Button variant="outline" onClick={() => setIsDimensionsModalOpen(true)}>
-                    {draft.dimensions ? 'Editar' : 'Definir'} Dimensões
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="description">Descrição do Produto</Label>
-                <Textarea
-                  id="description"
-                  value={draft.description}
-                  onChange={handleDescriptionChange}
-                  placeholder="Descrição detalhada do produto..."
-                  rows={4}
-                />
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {/* Variants Section */}
-          <div className="p-6 border rounded-lg shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Variantes</h2>
-              <Button onClick={() => setIsColorModalOpen(true)}>Adicionar/Gerenciar Cores</Button>
-            </div>
-            {draft.variants.length === 0 && (
-              <p className="text-muted-foreground">Nenhuma variante criada ainda. Adicione cores para gerar variantes.</p>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {
-                draft.variants.map(variant => (
-                  <VariantCard
-                    key={variant.id}
-                    variant={variant}
-                    onChange={handleVariantChange}
-                    onRemove={handleVariantRemove}
-                    onAssignImageToVariant={handleAssignImageToVariant} // Pass the new handler
-                  />
-                ))
-              }
-            </div>
-          </div>
-          
-          {/* Image Uploader */}
-          <div className="p-6 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Upload & Atribuir Imagens</h2>
-            <ImageUploader
-                onUploadComplete={handleImageUploadComplete}
-                unassignedImages={unassignedImages}
-                onRemoveUnassignedImage={handleRemoveUnassignedImage}
-            />
-          </div>
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Variantes</CardTitle>
+                <Button onClick={() => setIsColorModalOpen(true)}>
+                  <Palette className="mr-2 h-4 w-4" />
+                  Adicionar/Gerenciar Cores
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {draft.variants.length === 0 && (
+                <p className="text-muted-foreground">Nenhuma variante criada ainda. Adicione cores para gerar variantes.</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {
+                  // Filtra as variantes para exibir apenas as que foram explicitamente selecionadas
+                  draft.variants
+                    .filter(variant => variant.color && variant.hex) // Exibe apenas variantes com cor definida
+                    .map(variant => (
+                      <VariantCard
+                        key={variant.id}
+                        variant={variant}
+                        onChange={handleVariantChange}
+                        onRemove={handleVariantRemove}
+                        onAssignImageToVariant={handleAssignImageToVariant}
+                      />
+                    ))
+                }
+              </div>
+            </CardContent>
+          </Card>
           
           {/* SEO Section */}
-          <div className="p-6 border rounded-lg shadow-sm">
-            <h2 className="text-xl font-semibold mb-4">Informações de SEO</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="seoTitle">Título SEO</Label>
-                <Input
-                  id="seoTitle"
-                  value={draft.seoTitle || ''}
-                  onChange={handleSeoTitleChange}
-                  placeholder="Título SEO do Produto"
-                />
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações de SEO</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="seoTitle">Título SEO</Label>
+                  <Input
+                    id="seoTitle"
+                    value={draft.seoTitle || ''}
+                    onChange={handleSeoTitleChange}
+                    placeholder="Título SEO do Produto"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="seoDescription">Descrição SEO</Label>
+                  <Textarea
+                    id="seoDescription"
+                    value={draft.seoDescription || ''}
+                    onChange={handleSeoDescriptionChange}
+                    placeholder="Descrição SEO do Produto"
+                    rows={3}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="newKeyword">Palavras-chave</Label>
+                  <div className="flex flex-wrap items-center mb-2">
+                    {(draft.keywords || []).map((keyword) => (
+                      <Badge key={keyword} variant="secondary" className="mr-2 mb-2 group relative">
+                        {keyword}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveKeyword(keyword)}
+                          className="ml-2 p-0.5 rounded-full opacity-50 group-hover:opacity-100 hover:bg-destructive/50 focus:outline-none"
+                          aria-label={`Remover tag ${keyword}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Input
+                      id="newKeyword"
+                      value={currentKeywordInput}
+                      onChange={(e) => setCurrentKeywordInput(e.target.value)}
+                      onKeyDown={handleKeywordInputKeyDown}
+                      placeholder="Adicionar palavra-chave"
+                      className="flex-1"
+                    />
+                    <Button type="button" variant="outline" onClick={handleAddKeyword}>
+                      Adicionar
+                    </Button>
+                  </div>
+                  {/* A instrução antiga sobre vírgulas foi removida, pois a entrada agora é por tag.
+                      Pode-se adicionar uma nova instrução se necessário, ex:
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Pressione Enter ou clique em Adicionar para incluir uma nova tag.
+                  </p>
+                  */}
+                </div>
               </div>
-              <div>
-                <Label htmlFor="seoDescription">Descrição SEO</Label>
-                <Textarea
-                  id="seoDescription"
-                  value={draft.seoDescription || ''}
-                  onChange={handleSeoDescriptionChange}
-                  placeholder="Descrição SEO do Produto"
-                  rows={3}
-                />
-              </div>
-              <div>
-                <Label htmlFor="keywords">Palavras-chave</Label>
-                <Input
-                  id="keywords"
-                  value={(draft.keywords || []).join(', ')}
-                  onChange={handleKeywordsChange}
-                  placeholder="Palavras-chave separadas por vírgula, ex: palavra1, palavra2"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Insira palavras-chave separadas por vírgulas.
-                </p>
-              </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
         </div>
         
         {/* Right Sidebar / Actions */}
         <div className="md:col-span-1 space-y-6 sticky top-4 self-start max-h-[calc(100vh-1rem)] overflow-y-auto">
           <ProgressSidebar draft={draft} />
-          <div className="p-6 border rounded-lg shadow-sm">
-             <h2 className="text-xl font-semibold mb-4">Ações</h2>
-            <div className="space-y-2">
-              <Button onClick={handleSaveDraft} className="w-full" variant="outline">Salvar Rascunho</Button>
-              <Button onClick={handlePublish} className="w-full">Publicar Produto</Button>
-            </div>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Ações</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Button onClick={handleSaveDraft} className="w-full" variant="outline">
+                  <Save className="mr-2 h-4 w-4" />
+                  Salvar Rascunho
+                </Button>
+                <Button onClick={handlePublish} className="w-full">
+                  <Send className="mr-2 h-4 w-4" />
+                  Publicar Produto
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -632,6 +737,7 @@ export const ProductForm: React.FC = () => {
         isOpen={isColorModalOpen}
         onClose={() => setIsColorModalOpen(false)}
         onColorsChosen={handleColorsChosen}
+        initialPredefinedColors={PREDEFINED_COLORS}
       />
     </div>
   );

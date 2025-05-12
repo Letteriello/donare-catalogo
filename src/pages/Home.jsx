@@ -224,14 +224,14 @@ export default function Home() {
                     >
                       <Link
                         to={`/catalog?categoria=${category.id}`}
-                        className="block h-60 sm:h-72 md:h-80 bg-neutral-800 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 ease-in-out overflow-hidden relative group"
+                        className="block w-full h-full overflow-hidden relative group"
                       >
-                        {/* Imagem de fundo da categoria */}
-                        {category.imageUrl ? (
+                        {/* Imagem de fundo */}
+                        {category.image ? (
                           <img
-                            src={category.imageUrl}
+                            src={category.image}
                             alt={category.name}
-                            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" // Efeito de zoom mais suave e pronunciado
+                            className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
                             loading="lazy"
                           />
                         ) : (

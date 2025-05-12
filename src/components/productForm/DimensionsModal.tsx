@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast"; // Adicionado useToast
 
 interface Dimensions {
   width: string;
@@ -82,6 +83,7 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
   onSave,
   currentDimensions,
 }) => {
+  const { toast } = useToast(); // Instanciado toast
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
   const [depth, setDepth] = useState('');
@@ -108,7 +110,11 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
     } else {
       // Basic validation: all fields must be filled
       // Consider adding a toast message here for better UX
-      alert("Por favor, preencha todas as dimensões e selecione uma unidade.");
+      toast({ // Substituído alert por toast
+        title: "Campos incompletos",
+        description: "Por favor, preencha todas as dimensões (Largura, Altura, Profundidade) e selecione uma unidade.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -127,6 +133,7 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
               <Input
                 id="dimWidth"
                 type="number"
+                min="0" // Adicionado min="0"
                 value={width}
                 onChange={(e) => setWidth(e.target.value)}
                 placeholder="Ex: 10"
@@ -137,6 +144,7 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
               <Input
                 id="dimHeight"
                 type="number"
+                min="0" // Adicionado min="0"
                 value={height}
                 onChange={(e) => setHeight(e.target.value)}
                 placeholder="Ex: 20"
@@ -147,6 +155,7 @@ export const DimensionsModal: React.FC<DimensionsModalProps> = ({
               <Input
                 id="dimDepth"
                 type="number"
+                min="0" // Adicionado min="0"
                 value={depth}
                 onChange={(e) => setDepth(e.target.value)}
                 placeholder="Ex: 5"

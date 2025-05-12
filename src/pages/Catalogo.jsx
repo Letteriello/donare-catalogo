@@ -1,14 +1,17 @@
-
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { Product } from "@/api/entities";
 import { Category } from "@/api/entities";
-import { ChevronLeft, RefreshCw, Home } from "lucide-react"; // Added Home icon
+import { ChevronLeft, RefreshCw, Home, ChevronRight, List } from "lucide-react";
 import { motion } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 export default function Catalogo() {
   const [products, setProducts] = useState([]);
@@ -17,7 +20,6 @@ export default function Catalogo() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const location = useLocation();
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     setIsLoading(true);
@@ -180,165 +182,231 @@ export default function Catalogo() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F1EC] bg-[url('/img/subtle-pattern.png')] bg-opacity-50">
-      <div className="container mx-auto px-4 py-8 relative">
-        {/* Elemento visual decorativo */}
-        <div className="hidden md:block absolute top-0 right-0 w-64 h-64 bg-[#0B1F3A]/5 rounded-full -z-10 blur-3xl"></div>
-        <div className="hidden md:block absolute bottom-0 left-0 w-48 h-48 bg-[#B9A67E]/10 rounded-full -z-10 blur-3xl"></div>
-        {/* Navegação Aprimorada */}
-        <div className={`${isMobile ? 'sticky top-0 z-10 px-3 py-4 -mx-4 mb-6 bg-[#F4F1EC]/95 backdrop-blur-sm shadow-sm' : 'mb-8'}`}>
-          <div className={`flex ${isMobile ? 'justify-between w-full' : 'flex-wrap gap-3'}`}>
+    <div className="min-h-screen bg-[#F9F6F3]">
+      {/* Header fixo com navegação */}
+      <div className="sticky top-0 z-50 bg-white border-b border-[#0B1F3A]/10 shadow-sm">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
             <Button
               asChild
-              size={isMobile ? "xl" : "default"}
-              className={`${isMobile ? 'flex-1 mr-2' : ''} bg-[#0B1F3A] text-white rounded-xl shadow-md hover:bg-[#0A1A30] transition-all group min-h-[48px]`}
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-[#0B1F3A] hover:bg-[#0B1F3A]/5"
             >
               <Link to="/home">
-                <ChevronLeft size={isMobile ? 22 : 20} className={`${isMobile ? '' : 'mr-2'} transition-transform group-hover:-translate-x-1`} />
-                {!isMobile && <span className="font-medium">Voltar para Categorias</span>}
+                <ChevronLeft className="h-5 w-5" />
               </Link>
             </Button>
-
+            
+            <h1 className="font-belleza text-lg sm:text-xl text-[#0B1F3A] truncate px-2 text-center flex-1">
+              {category ? category.name : "Catálogo"}
+            </h1>
+            
             <Button
               asChild
-              variant="outline"
-              size={isMobile ? "xl" : "default"}
-              className={`${isMobile ? 'flex-1' : ''} bg-white text-[#0B1F3A] hover:bg-[#0B1F3A]/10 rounded-xl shadow-sm group transition-all min-h-[48px]`}
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-[#0B1F3A] hover:bg-[#0B1F3A]/5"
             >
               <Link to="/">
-                {isMobile ? (
-                  <div className="flex items-center justify-center w-full">
-                    <Home size={22} className="transition-transform group-hover:scale-110" />
-                  </div>
-                ) : (
-                  <>
-                    <Home size={16} className="mr-2 transition-transform group-hover:scale-110" />
-                    <span className="font-medium">Página Inicial</span>
-                  </>
-                )}
+                <Home className="h-5 w-5" />
               </Link>
             </Button>
           </div>
-          
-          {/* Título da Categoria em Mobile - Move para dentro da navegação fixa */}
-          {isMobile && category && (
-            <h1 className="font-belleza text-xl text-center text-[#0B1F3A] mt-2 truncate px-6">
-              {category.name}
-            </h1>
-          )}
         </div>
+      </div>
+      
+      <div className="container mx-auto px-4 py-4 relative">
 
+        {/* Categorias em formato lista (para mobile) */}
+        {category && (
+          <div className="mb-4 rounded-lg">
+            <ScrollArea className="overflow-x-auto whitespace-nowrap py-2 hidden sm:block">
+              <div className="flex space-x-2 pb-1">
+                <Badge 
+                  variant="outline" 
+                  className="py-1.5 px-3 flex items-center bg-white shadow-sm cursor-pointer hover:bg-[#0B1F3A]/5 font-medium text-sm"
+                >
+                  <Link to="/home" className="flex items-center">
+                    <List className="mr-1.5 h-3.5 w-3.5" />
+                    Todas as categorias
+                  </Link>
+                </Badge>
+                <Separator orientation="vertical" className="h-6 bg-[#0B1F3A]/10" />
+                <Badge 
+                  className="py-1.5 px-3 bg-[#0B1F3A] text-white shadow-sm font-medium text-sm flex items-center"
+                >
+                  {category.image && (
+                    <img 
+                      src={category.image} 
+                      alt={category.name}
+                      className="w-5 h-5 rounded-full mr-1.5 object-cover" 
+                    />
+                  )}
+                  {category.name}
+                </Badge>
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+        
         {/* Estado de Carregamento Aprimorado */}
         {isLoading ? (
-          <div className={`grid ${isMobile ? 'grid-cols-1 gap-8' : 'grid-cols-2 lg:grid-cols-3 gap-6'}`}>
-            {[...Array(isMobile ? 2 : 6)].map((_, index) => (
-              <div key={index} className="bg-white rounded-xl overflow-hidden shadow-md relative">
-                {/* Adiciona um overlay com gradiente para dar um aspecto mais sofisticado */}
-                <div className="absolute inset-0 bg-gradient-to-br from-[#0B1F3A]/5 to-transparent animate-pulse"></div>
-                <Skeleton className={`${isMobile ? 'h-72' : 'h-64'} w-full`} />
-                <div className="p-6">
-                  <Skeleton className="h-8 w-3/4 mb-3" />
-                  <Skeleton className="h-4 w-full mb-2" />
-                  <Skeleton className="h-4 w-5/6 mb-4" />
-                  <div className="flex justify-between items-center">
-                    <Skeleton className="h-6 w-1/3" />
-                    {isMobile && <Skeleton className="h-4 w-1/4" />}
+          <div className="space-y-4">
+            {[...Array(5)].map((_, index) => (
+              <Card key={index} className="overflow-hidden shadow-sm border-[#0B1F3A]/10">
+                <div className="flex items-center">
+                  <div className="p-3 w-24 sm:w-32">
+                    <AspectRatio ratio={1} className="overflow-hidden rounded bg-[#0B1F3A]/5">
+                      <Skeleton className="h-full w-full" />
+                    </AspectRatio>
+                  </div>
+                  <div className="p-3 flex-1">
+                    <Skeleton className="h-6 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-1/3" />
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         ) : error ? (
-          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6 text-center">
-            <p>{error}</p>
-            <button 
+          <div className="bg-white rounded-lg shadow-sm p-6 text-center mb-6 border border-red-200">
+            <h3 className="font-medium text-red-600 mb-2">Ocorreu um Erro</h3>
+            <p className="text-gray-700 mb-4">
+              {error}
+            </p>
+            <Button
               onClick={handleRetry}
-              className="mt-2 inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-all"
+              variant="destructive"
+              className="mt-2"
             >
               <RefreshCw size={16} className="mr-2" />
               Tentar Novamente
-            </button>
+            </Button>
           </div>
         ) : (
           <>
-            {/* Título da Categoria com Design Aprimorado - apenas para desktop */}
-            {!isMobile && category && (
-              <div className="text-center mb-12 relative">
-                <div className="absolute left-0 right-0 top-1/2 border-t border-[#0B1F3A]/10 -z-10"></div>
-                <h1 className="font-belleza text-3xl md:text-4xl text-[#0B1F3A] mb-2 inline-block bg-[#F4F1EC] px-6">
-                  {category.name}
-                </h1>
-                {category.description && (
-                  <p className="text-[#0B1F3A]/70 max-w-2xl mx-auto mt-3">
-                    {category.description}
-                  </p>
-                )}
-                <div className="w-24 h-1 bg-gradient-to-r from-transparent via-[#B9A67E] to-transparent mx-auto mt-4"></div>
-              </div>
-            )}
-
-            {/* Lista de Produtos - Layout otimizado para mobile */}
-                <div className={`grid ${isMobile ? 'grid-cols-1 gap-8' : 'grid-cols-2 lg:grid-cols-3 gap-6'}`}>
-                  {processedProducts.map(product => (
-                    <motion.div
-                      key={product.id} // This will be baseProductName for grouped, or product.id for singles
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 ease-in-out transform hover:-translate-y-1"
-                    >
-                      <Link
-                        to={product.isGrouped ? `${createPageUrl("ProdutoDetalhe")}?id=${product.variants[0].id}&group=${product.name}` : `${createPageUrl("ProdutoDetalhe")}?id=${product.id}`}
-                        className="block min-h-[48px]" // Aumenta área clicável
-                      >
-                        <div className={`${isMobile ? 'h-72' : 'h-64'} overflow-hidden`}>
-                          <img
-                            src={product.main_image} // For grouped, this is the first variant's image
-                            alt={product.name} // For grouped, this is the baseProductName
-                            className="w-full h-full object-cover transition-transform duration-500 ease-in-out group-hover:scale-110"
-                            loading="lazy" // Otimização de carregamento
-                          />
+            {/* Lista de Produtos em Formato Listview Mobile-Friendly */}
+            <div className="space-y-3">
+              {processedProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: index * 0.05 }}
+                >
+                  <Link
+                    to={createPageUrl("ProdutoDetalhe", { id: product.id, isGrouped: product.isGrouped ? '1' : '0' })}
+                    className="block"
+                  >
+                    <Card className="overflow-hidden border-[#0B1F3A]/10 shadow-sm hover:shadow-md transition-all duration-200 group">
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="relative w-full sm:w-40 md:w-48 flex-shrink-0">
+                          <AspectRatio ratio={1} className="h-full">
+                            <img
+                              src={product.main_image}
+                              alt={product.name}
+                              className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+                              loading="lazy"
+                            />
+                          </AspectRatio>
+                          {product.isGrouped && (
+                            <Badge className="absolute top-2 right-2 text-xs bg-[#0B1F3A]/80 hover:bg-[#0B1F3A] px-2 py-1 rounded-full">
+                              {product.variants.length} cores
+                            </Badge>
+                          )}
                         </div>
-                        <div className={`p-6 ${isMobile ? 'pb-8' : ''}`}>
-                          <h3 className="font-belleza text-xl sm:text-2xl text-[#0B1F3A] mb-2">{product.name}</h3>
-                          <p className="text-[#0B1F3A]/80 text-sm md:text-base line-clamp-2 mb-4">
-                            {product.isGrouped ? `Disponível em ${product.variants.length} cores` : product.description}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            {!product.isGrouped && (
-                              <span className="text-[#0B1F3A] font-semibold text-lg">
-                                {product.price != null
-                                  ? `R$ ${product.price.toFixed(2)}`
-                                  : "Sob consulta"}
-                              </span>
-                            )}
-                            {isMobile && (
-                              <span className="text-sm text-[#0B1F3A]/60 underline">Ver detalhes</span>
-                            )}
+                        <div className="p-4 flex flex-col justify-between flex-1">
+                          <div>
+                            <h3 className="font-medium text-[#0B1F3A] line-clamp-1 mb-2 text-lg">
+                              {product.name}
+                            </h3>
+                            <p className="text-[#0B1F3A]/70 text-sm leading-relaxed line-clamp-2">
+                              {product.isGrouped ? `Disponível em ${product.variants.length} cores/variantes` : product.description}
+                            </p>
+                          </div>
+                          <div className="flex justify-between items-center mt-3 pt-2 border-t border-[#0B1F3A]/10">
+                            <div className="text-[#0B1F3A] font-medium">
+                              {product.price != null
+                                ? (product.isGrouped ? `A partir de R$ ${product.price.toFixed(2)}` : `R$ ${product.price.toFixed(2)}`)
+                                : "Sob consulta"}
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="text-[#0B1F3A]/70 hover:text-[#0B1F3A] hover:bg-[#0B1F3A]/5 rounded-full p-2"
+                            >
+                              <span className="text-xs mr-1 hidden sm:inline">Detalhes</span>
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                      </Link>
-                    </motion.div>
+                      </div>
+                    </Card>
+                  </Link>
+                </motion.div>
               ))}
             </div>
- 
-            {/* Mensagem quando não há produtos - Com melhor design */}
-            {processedProducts.length === 0 && (
-              <div className="text-center py-16 bg-white/50 rounded-xl border border-[#0B1F3A]/10 backdrop-blur-sm">
-                <div className="max-w-md mx-auto px-6">
-                  <h3 className="font-belleza text-xl text-[#0B1F3A] mb-3">Nenhum produto encontrado</h3>
-                  <p className="text-[#0B1F3A]/70 mb-6">
-                    Ainda não temos produtos cadastrados nesta categoria, mas estamos trabalhando para adicionar novidades em breve.
+
+            {/* Mensagem quando não há produtos - Design simplificado */}
+            {processedProducts.length === 0 && !isLoading && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white rounded-xl shadow-sm p-8 text-center mt-8 border border-[#0B1F3A]/5"
+              >
+                <div className="max-w-md mx-auto">
+                  <div className="relative h-32 mb-6">
+                    <motion.div 
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.2, duration: 0.5 }}
+                      className="absolute inset-0 flex items-center justify-center"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-[#0B1F3A]/20">
+                        <path d="M21 7v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1h9.586a1 1 0 0 1 .707.293l7.414 7.414a1 1 0 0 1 .293.707Z"></path>
+                        <path d="M14 3v5a1 1 0 0 0 1 1h5"></path>
+                        <path d="M7 13h10"></path>
+                        <path d="M7 17h10"></path>
+                        <path d="M7 9h3"></path>
+                      </svg>
+                    </motion.div>
+                  </div>
+                  
+                  <h2 className="font-medium text-[#0B1F3A] text-xl mb-3">Catálogo em Expansão</h2>
+                  <p className="text-[#0B1F3A]/70 text-base mb-6 leading-relaxed">
+                    Ainda não temos produtos cadastrados nesta categoria, mas nosso catálogo 
+                    está sempre crescendo com novas adições.
                   </p>
-                  <Button
-                    asChild
-                    className="bg-[#0B1F3A] text-white hover:bg-[#0B1F3A]/90"
-                  >
-                    <Link to="/home">
-                      Explorar outras categorias
-                    </Link>
-                  </Button>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button
+                      asChild
+                      size="default"
+                      className="bg-[#0B1F3A] text-white hover:bg-[#0B1F3A]/90 rounded-full px-6"
+                    >
+                      <Link to="/home">
+                        <Home className="mr-2 h-4 w-4" />
+                        Página Inicial
+                      </Link>
+                    </Button>
+                    
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="default"
+                      className="border-[#0B1F3A]/20 text-[#0B1F3A] hover:bg-[#0B1F3A]/5 rounded-full px-6"
+                    >
+                      <Link to="#" onClick={() => window.history.back()}>
+                        <ChevronLeft className="mr-2 h-4 w-4" />
+                        Voltar
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
             )}
           </>
         )}

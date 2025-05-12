@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/components/ui/use-toast';
-import { X } from 'lucide-react';
+import { X, UploadCloud } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 // Removed useProductDraftStore imports as direct manipulation is not done here anymore for adding images to variants
 
 // Type for the server response for a single file upload
@@ -62,19 +63,27 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     setCurrentBatchFiles(initialImageStates); // Set current batch for UI updates
 
-    const uploadPromises = initialImageStates.map(async (imageState) => {
+    const processedResults: {
+      tempId: string;
+      originalName: string;
+      fileId?: string;
+      url?: string;
+      error?: string
+    }[] = [];
+
+    for (const imageState of initialImageStates) {
       const formData = new FormData();
-      formData.append('files', imageState.file!); 
+      formData.append('files', imageState.file!);
 
       try {
         // Simulate progress
         for (let p = 0; p <= 70; p += 10) {
-            await new Promise(resolve => setTimeout(resolve, 50));
-            setCurrentBatchFiles(prev =>
-                prev.map(img =>
-                    img.id === imageState.id ? { ...img, progress: p } : img
-                )
-            );
+          await new Promise(resolve => setTimeout(resolve, 50));
+          setCurrentBatchFiles(prev =>
+            prev.map(img =>
+              img.id === imageState.id ? { ...img, progress: p } : img
+            )
+          );
         }
 
         const response = await fetch('/api/uploads', {
@@ -83,9 +92,9 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
         });
 
         setCurrentBatchFiles(prev =>
-            prev.map(img =>
-                img.id === imageState.id ? { ...img, progress: 100 } : img
-            )
+          prev.map(img =>
+            img.id === imageState.id ? { ...img, progress: 100 } : img
+          )
         );
 
         if (!response.ok) {
@@ -93,43 +102,35 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
           throw new Error(errorData.message || 'Unknown upload error');
         }
 
-        // Assuming /api/uploads for a single file in 'files' field returns UploadedFileResponse[] with one item.
-        // If API can truly accept multiple 'files' fields or a list and returns multiple, this would need adjustment.
-        // For now, assuming one file per request cycle, matching `results[0]` logic.
-        const results: UploadedFileResponse[] = await response.json(); 
-        const result = results[0]; 
-        
+        const results: UploadedFileResponse[] = await response.json();
+        const result = results[0];
+
         if (!result || !result.fileId || !result.url) {
-            throw new Error('Invalid response structure from upload API.');
+          throw new Error('Invalid response structure from upload API.');
         }
 
-        return {
-          // This is the successful file data to be passed to onUploadComplete
-          fileId: result.fileId, 
-          url: result.url,   
-          originalName: imageState.originalName, // Keep original name
-          // Include other data for internal state update if needed, or for onUploadComplete
-          tempId: imageState.id, // To map back and update the currentBatchFiles state
+        processedResults.push({
+          fileId: result.fileId,
+          url: result.url,
+          originalName: imageState.originalName,
+          tempId: imageState.id,
           error: undefined,
-        };
+        });
 
       } catch (error: any) {
         console.error(`Error uploading ${imageState.originalName}:`, error);
-        // Update this specific file in currentBatchFiles with an error
         setCurrentBatchFiles(prev =>
-            prev.map(img =>
-                img.id === imageState.id ? { ...img, error: error.message || 'Upload failed', progress: 100 } : img
-            )
+          prev.map(img =>
+            img.id === imageState.id ? { ...img, error: error.message || 'Upload failed', progress: 100 } : img
+          )
         );
-        return { // This structure helps in Promise.all to know it failed
+        processedResults.push({
           tempId: imageState.id,
           originalName: imageState.originalName,
           error: error.message || 'Upload failed',
-        };
+        });
       }
-    });
-
-    const processedResults = await Promise.all(uploadPromises);
+    }
 
     const successfulUploads: UploadedFileResponse[] = [];
     processedResults.forEach(res => {
@@ -242,7 +243,7 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
     propUnassignedImages.map((image) => (
       <div 
         key={image.id} 
-        className={`relative group border rounded-md p-1 aspect-square flex flex-col items-center justify-center ${image.error ? 'border-red-500' : 'border-muted'} ${!image.error ? 'cursor-grab' : 'cursor-not-allowed'}`}
+        className={`relative group border rounded-md p-1 aspect-square flex flex-col items-center justify-center ${image.error ? 'border-red-500' : 'border-muted'} ${!image.error ? 'cursor-grab hover:shadow-md group-hover:scale-105' : 'cursor-not-allowed'} transition-all duration-150 ease-in-out`}
         draggable={!image.error}
         onDragStart={(e) => handleDragStartImage(e, image)}
       >
@@ -277,12 +278,15 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
                     ${isDragActive ? 'border-primary bg-primary-foreground' : 'border-muted-foreground/50 hover:border-primary'}`}
       >
         <input {...getInputProps()} />
+        <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground mb-2" />
         {isUploadingGlobal ? (
             <p className="text-primary">Uploading batch...</p>
         ) : isDragActive ? (
           <p className="text-primary">Drop the images here ...</p>
         ) : (
-          <p className="text-muted-foreground">Drag & drop some images here, or click to select images</p>
+          <p className="text-muted-foreground">
+            <span className="font-semibold text-primary">Clique para enviar</span> ou arraste e solte
+          </p>
         )}
         <p className="text-xs text-muted-foreground mt-1">Supports: JPG, PNG, WEBP, GIF</p>
       </div>
@@ -311,10 +315,18 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
             <h3 className="text-lg font-semibold">
               Unassigned Images ({propUnassignedImages.filter(img => !img.error).length})
             </h3>
-            {/* Auto-assign button can remain, but its logic will involve propUnassignedImages and calling ProductForm or Zustand actions */}
-            <Button variant="outline" size="sm" onClick={() => console.log("Auto-assign clicked - TBD")} disabled={isUploadingGlobal || propUnassignedImages.filter(img => !img.error).length === 0}>
-              Auto-assign by Name
-            </Button>
+            <TooltipProvider>
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => console.log("Auto-assign clicked - TBD")} disabled={isUploadingGlobal || propUnassignedImages.filter(img => !img.error).length === 0}>
+                    Auto-assign by Name
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Funcionalidade em desenvolvimento</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           {propUnassignedImages.length === 0 && currentBatchFiles.every(f => !f.error) && (
              <p className="text-muted-foreground">No images uploaded yet, or all assigned.</p>
